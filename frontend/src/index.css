@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-on-surface antialiased font-sans;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    display: inline-block;
+    vertical-align: middle;
+  }
+}
+
+@layer components {
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d4c3bf;
+    border-radius: 10px;
+  }
+
+  /* Typography */
+  .font-headline {
+    font-family: 'Noto Serif', serif;
+  }
+
+  /* Nav active pill */
+  .nav-active {
+    @apply bg-gradient-to-r from-primary to-primary-container text-white rounded-full mx-4 py-3 px-6 shadow-lg flex items-center gap-3;
+  }
+
+  .nav-item {
+    @apply text-primary/70 hover:translate-x-1 py-3 px-10 transition-transform flex items-center gap-3 cursor-pointer;
+  }
+
+  /* Status badges */
+  .badge-available {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700;
+  }
+  .badge-occupied {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-primary text-on-primary;
+  }
+  .badge-bill-requested {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-secondary-container text-on-secondary-container;
+  }
+  .badge-reserved {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-tertiary-fixed text-on-tertiary-fixed-variant;
+  }
+
+  /* Minimalist input (Stitch style — bottom border only) */
+  .input-minimal {
+    @apply w-full bg-transparent border-0 border-b border-outline-variant py-3 px-0 focus:ring-0 focus:border-primary transition-all text-primary placeholder-on-surface-variant/40 outline-none;
+  }
+
+  /* Card */
+  .card {
+    @apply bg-surface-container-lowest rounded-xl shadow-card;
+  }
+
+  /* Primary gradient button */
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary to-primary-container text-white rounded-full font-bold shadow-lg hover:opacity-90 transition-all;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    @apply bg-surface-container-highest text-on-surface rounded-full font-bold hover:bg-surface-variant transition-colors;
+  }
+}
