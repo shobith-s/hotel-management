@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 
 import AppLayout from './components/shared/AppLayout'
+import RequireAuth from './components/shared/RequireAuth'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import MenuPage from './pages/MenuPage'
@@ -21,18 +22,23 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          {/* Public */}
-          <Route path="/login" element={<LoginPage />} />
+          {/* Public — redirect to dashboard if already logged in */}
+          <Route
+            path="/login"
+            element={localStorage.getItem('token') ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+          />
 
-          {/* App (with Sidebar) */}
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/menu" element={<MenuPage />} />
-            <Route path="/orders" element={<OrderEntryPage />} />
-            <Route path="/kds" element={<KDSPage />} />
-            <Route path="/billing" element={<BillingPage />} />
-            <Route path="/lodge" element={<LodgePage />} />
-            <Route path="/users" element={<UsersPage />} />
+          {/* Protected app routes — RequireAuth validates token before rendering */}
+          <Route element={<RequireAuth />}>
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/menu" element={<MenuPage />} />
+              <Route path="/orders" element={<OrderEntryPage />} />
+              <Route path="/kds" element={<KDSPage />} />
+              <Route path="/billing" element={<BillingPage />} />
+              <Route path="/lodge" element={<LodgePage />} />
+              <Route path="/users" element={<UsersPage />} />
+            </Route>
           </Route>
 
           {/* Default */}

@@ -41,10 +41,13 @@ export default function Sidebar() {
 
       {/* Bottom */}
       <div className="px-6 mt-auto space-y-4">
-        <button className="w-full btn-primary py-3 px-6 flex items-center justify-center gap-2">
+        <NavLink
+          to="/lodge"
+          className="w-full btn-primary py-3 px-6 flex items-center justify-center gap-2"
+        >
           <span className="material-symbols-outlined text-sm">add</span>
           <span>New Booking</span>
-        </button>
+        </NavLink>
         <div className="pt-4 border-t border-outline-variant/10 flex flex-col gap-1">
           <a className="text-primary/70 hover:text-primary py-2 flex items-center gap-4 px-2 transition-colors text-sm">
             <span className="material-symbols-outlined text-[20px]">help_outline</span>
