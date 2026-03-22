@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
-import { fetchFullMenu, MenuCategory, MenuItem } from '../api/menu'
+import { fetchFullMenu, MenuCategory } from '../api/menu'
 import api from '../api/client'
-
-const roleColors: Record<string, string> = {}
 
 function toggleItem(itemId: string) {
   return api.post(`/menu/items/${itemId}/toggle`)
@@ -16,13 +14,13 @@ export default function MenuPage() {
   const [vegFilter, setVegFilter] = useState<'all' | 'veg' | 'nonveg'>('all')
 
   const { data: menu = [], isLoading } = useQuery<MenuCategory[]>({
-    queryKey: ['menu'],
-    queryFn: fetchFullMenu,
+    queryKey: ['menu', 'all'],
+    queryFn: () => fetchFullMenu(false),  // show all items including unavailable
   })
 
   const toggleMutation = useMutation({
     mutationFn: toggleItem,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['menu'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['menu', 'all'] }),
   })
 
   const activeCategory = activeCatId

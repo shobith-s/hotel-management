@@ -26,7 +26,7 @@ export interface MenuCategory {
   items: MenuItem[]
 }
 
-export async function fetchFullMenu(): Promise<MenuCategory[]> {
-  const res = await api.get<MenuCategory[]>('/menu/')
+export async function fetchFullMenu(availableOnly = true): Promise<MenuCategory[]> {
+  const res = await api.get<MenuCategory[]>('/menu/', { params: { available_only: availableOnly } })
   return res.data
 }
