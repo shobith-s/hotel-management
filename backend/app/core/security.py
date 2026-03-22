@@ -17,6 +17,17 @@ from app.schemas.user import TokenData
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
+# In-memory token blacklist — survives for the process lifetime (sufficient for single-server dev)
+_revoked_tokens: set[str] = set()
+
+
+def revoke_token(token: str) -> None:
+    _revoked_tokens.add(token)
+
+
+def is_token_revoked(token: str) -> bool:
+    return token in _revoked_tokens
+
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -46,6 +57,8 @@ def decode_token(token: str) -> TokenData:
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     from app.models.user import User
+    if is_token_revoked(token):
+        raise HTTPException(status_code=401, detail="Token has been revoked")
     token_data = decode_token(token)
     user = db.get(User, token_data.user_id)
     if not user or not user.is_active:

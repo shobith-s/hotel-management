@@ -23,4 +23,13 @@ api.interceptors.response.use(
   },
 )
 
+export async function logout() {
+  try {
+    await api.post('/auth/logout')
+  } finally {
+    localStorage.removeItem('token')
+    window.location.href = '/login'
+  }
+}
+
 export default api

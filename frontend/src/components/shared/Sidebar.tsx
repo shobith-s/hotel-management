@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { logout } from '../../api/client'
 
 const navItems = [
   { to: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
@@ -53,13 +54,13 @@ export default function Sidebar() {
             <span className="material-symbols-outlined text-[20px]">help_outline</span>
             <span className="font-medium">Support</span>
           </a>
-          <NavLink
-            to="/login"
-            className="text-primary/70 hover:text-primary py-2 flex items-center gap-4 px-2 transition-colors text-sm"
+          <button
+            onClick={() => logout()}
+            className="text-primary/70 hover:text-primary py-2 flex items-center gap-4 px-2 transition-colors text-sm w-full"
           >
             <span className="material-symbols-outlined text-[20px]">logout</span>
             <span className="font-medium">Logout</span>
-          </NavLink>
+          </button>
         </div>
       </div>
     </aside>
