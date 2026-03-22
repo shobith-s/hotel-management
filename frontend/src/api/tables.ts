@@ -2,7 +2,7 @@ import api from './client'
 
 export interface Table {
   id: string
-  name: string
+  table_number: string
   capacity: number
   status: 'available' | 'occupied' | 'bill_requested' | 'reserved'
   section_id: string

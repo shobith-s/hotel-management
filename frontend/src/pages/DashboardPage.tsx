@@ -132,7 +132,7 @@ export default function DashboardPage() {
                 <tbody className="divide-y divide-outline-variant/10">
                   {tables.map((t) => (
                     <tr key={t.id} className="hover:bg-surface-container-low/30 transition-colors">
-                      <td className="px-6 py-5 font-bold text-primary">{t.name}</td>
+                      <td className="px-6 py-5 font-bold text-primary">{t.table_number}</td>
                       <td className="px-6 py-5 text-on-surface-variant">{t.capacity} seats</td>
                       <td className="px-6 py-5">
                         <span className={statusBadge[t.status] ?? 'badge-available'}>
