@@ -1,17 +1,33 @@
 import { NavLink } from 'react-router-dom'
 import { logout } from '../../api/client'
+import { useAuth, ROLE_ALLOWED_PATHS } from '../../context/AuthContext'
 
-const navItems = [
-  { to: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
-  { to: '/menu', icon: 'restaurant_menu', label: 'Menu' },
-  { to: '/orders', icon: 'receipt_long', label: 'Orders' },
-  { to: '/kds', icon: 'display_settings', label: 'Kitchen' },
-  { to: '/billing', icon: 'payments', label: 'Billing' },
-  { to: '/lodge', icon: 'bed', label: 'Lodge' },
-  { to: '/users', icon: 'group', label: 'Users' },
+const ALL_NAV_ITEMS = [
+  { to: '/dashboard', icon: 'dashboard',        label: 'Dashboard' },
+  { to: '/menu',      icon: 'restaurant_menu',   label: 'Menu' },
+  { to: '/orders',    icon: 'receipt_long',       label: 'Orders' },
+  { to: '/kds',       icon: 'display_settings',   label: 'Kitchen' },
+  { to: '/billing',   icon: 'payments',           label: 'Billing' },
+  { to: '/lodge',     icon: 'bed',                label: 'Lodge' },
+  { to: '/users',     icon: 'group',              label: 'Users' },
 ]
 
+const ROLE_LABELS: Record<string, string> = {
+  admin:        'Administrator',
+  manager:      'Manager',
+  waiter:       'Waiter',
+  receptionist: 'Receptionist',
+}
+
 export default function Sidebar() {
+  const { user } = useAuth()
+
+  const allowed = user ? (ROLE_ALLOWED_PATHS[user.role] ?? []) : ALL_NAV_ITEMS.map((n) => n.to)
+  const navItems = ALL_NAV_ITEMS.filter((item) => allowed.includes(item.to))
+
+  // "New Booking" shortcut only for roles with lodge access
+  const showNewBooking = user ? allowed.includes('/lodge') : false
+
   return (
     <aside className="h-screen w-72 fixed left-0 top-0 border-r border-outline-variant/15 bg-surface-container-low flex flex-col py-8 z-50">
       {/* Brand */}
@@ -42,18 +58,30 @@ export default function Sidebar() {
 
       {/* Bottom */}
       <div className="px-6 mt-auto space-y-4">
-        <NavLink
-          to="/lodge"
-          className="w-full btn-primary py-3 px-6 flex items-center justify-center gap-2"
-        >
-          <span className="material-symbols-outlined text-sm">add</span>
-          <span>New Booking</span>
-        </NavLink>
-        <div className="pt-4 border-t border-outline-variant/10 flex flex-col gap-1">
-          <a className="text-primary/70 hover:text-primary py-2 flex items-center gap-4 px-2 transition-colors text-sm">
-            <span className="material-symbols-outlined text-[20px]">help_outline</span>
-            <span className="font-medium">Support</span>
-          </a>
+        {showNewBooking && (
+          <NavLink
+            to="/lodge"
+            className="w-full btn-primary py-3 px-6 flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">add</span>
+            <span>New Booking</span>
+          </NavLink>
+        )}
+
+        {/* Logged-in user */}
+        {user && (
+          <div className="px-2 py-3 bg-surface-container rounded-xl flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-primary text-lg">person</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-primary truncate">{user.name}</p>
+              <p className="text-xs text-on-surface-variant">{ROLE_LABELS[user.role] ?? user.role}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="pt-2 border-t border-outline-variant/10 flex flex-col gap-1">
           <button
             onClick={() => logout()}
             className="text-primary/70 hover:text-primary py-2 flex items-center gap-4 px-2 transition-colors text-sm w-full"

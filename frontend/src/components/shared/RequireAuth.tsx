@@ -1,23 +1,27 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { useState } from 'react'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '../../api/client'
+import { AuthContext, ROLE_ALLOWED_PATHS, type AuthUser } from '../../context/AuthContext'
 
 export default function RequireAuth() {
   const token = localStorage.getItem('token')
-
-  // No token at all → go to login immediately, no loading flash
   if (!token) return <Navigate to="/login" replace />
-
   return <AuthCheck />
 }
 
-// Separate component so the hook only runs when a token exists
 function AuthCheck() {
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const location = useLocation()
+
   const { isLoading, isError } = useQuery({
     queryKey: ['auth-me'],
-    queryFn: () => api.get('/auth/me').then((r) => r.data),
+    queryFn: () => api.get('/auth/me').then((r) => {
+      setUser(r.data)
+      return r.data
+    }),
     retry: false,
-    staleTime: 5 * 60 * 1000,   // re-validate at most every 5 min
+    staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   })
 
@@ -34,5 +38,18 @@ function AuthCheck() {
     return <Navigate to="/login" replace />
   }
 
-  return <Outlet />
+  // Role-based route guard — redirect to role's home if accessing a forbidden page
+  if (user) {
+    const allowed = ROLE_ALLOWED_PATHS[user.role] ?? []
+    const currentPath = '/' + location.pathname.split('/')[1]
+    if (!allowed.includes(currentPath)) {
+      return <Navigate to={allowed[0]} replace />
+    }
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, setUser }}>
+      <Outlet />
+    </AuthContext.Provider>
+  )
 }
