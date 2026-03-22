@@ -52,27 +52,28 @@ function VariantPicker({
   const selectedVariant = item.variants.find((v) => v.id === selected)!
 
   return (
-    <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
-      {/* Toggle buttons for each variant */}
-      <div className="flex rounded-full overflow-hidden border border-outline-variant/30 text-xs">
-        {item.variants.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => setSelected(v.id)}
-            className={`px-3 py-1 font-bold transition-all ${
-              selected === v.id
-                ? 'bg-primary text-on-primary'
-                : 'text-on-surface-variant hover:bg-surface-container-low'
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
+    <div className="flex items-center justify-between mt-1 w-full" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-2">
+        <div className="flex rounded-full overflow-hidden border border-outline-variant/30 text-xs">
+          {item.variants.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setSelected(v.id)}
+              className={`px-3 py-1 font-bold transition-all ${
+                selected === v.id
+                  ? 'bg-primary text-on-primary'
+                  : 'text-on-surface-variant hover:bg-surface-container-low'
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs font-bold text-primary">₹{selectedVariant?.price}</span>
       </div>
-      <span className="text-xs font-bold text-primary">₹{selectedVariant?.price}</span>
       <button
         onClick={() => onAdd(selectedVariant)}
-        className="w-7 h-7 rounded-full border border-outline-variant flex items-center justify-center text-primary/40 hover:text-primary hover:border-primary transition-colors"
+        className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center text-primary/40 hover:text-primary hover:border-primary transition-colors"
       >
         <span className="material-symbols-outlined text-sm">add</span>
       </button>
