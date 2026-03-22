@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
-import { fetchFullMenu, MenuCategory, MenuItem } from '../api/menu'
+import { fetchFullMenu, type MenuCategory, type MenuItem, type MenuItemVariant } from '../api/menu'
 
 interface CartItem {
   id: string          // menuItemId + variantId
@@ -19,7 +19,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Veg Soup': 'soup_kitchen',
   'Veg Noodles': 'ramen_dining',
   'Veg Tandoor & Kabab': 'outdoor_grill',
-  'Salad & Raita': 'salad',
+  'Salad & Raita': 'eco',
   'Veg Starter': 'tapas',
   'Veg Main Course': 'restaurant',
   'Roti & Bread': 'grain',
@@ -37,15 +37,53 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Cold Drinks & Ice Cream': 'local_bar',
 }
 
-function defaultPrice(item: MenuItem): number {
-  const def = item.variants.find((v) => v.is_default) ?? item.variants[0]
-  return def?.price ?? 0
+// Inline variant picker shown directly on the item card
+function VariantPicker({
+  item,
+  onAdd,
+}: {
+  item: MenuItem
+  onAdd: (variant: MenuItemVariant) => void
+}) {
+  const [selected, setSelected] = useState<string>(
+    item.variants.find((v) => v.is_default)?.id ?? item.variants[0]?.id
+  )
+
+  const selectedVariant = item.variants.find((v) => v.id === selected)!
+
+  return (
+    <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+      {/* Toggle buttons for each variant */}
+      <div className="flex rounded-full overflow-hidden border border-outline-variant/30 text-xs">
+        {item.variants.map((v) => (
+          <button
+            key={v.id}
+            onClick={() => setSelected(v.id)}
+            className={`px-3 py-1 font-bold transition-all ${
+              selected === v.id
+                ? 'bg-primary text-on-primary'
+                : 'text-on-surface-variant hover:bg-surface-container-low'
+            }`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+      <span className="text-xs font-bold text-primary">₹{selectedVariant?.price}</span>
+      <button
+        onClick={() => onAdd(selectedVariant)}
+        className="w-7 h-7 rounded-full border border-outline-variant flex items-center justify-center text-primary/40 hover:text-primary hover:border-primary transition-colors"
+      >
+        <span className="material-symbols-outlined text-sm">add</span>
+      </button>
+    </div>
+  )
 }
 
 export default function OrderEntryPage() {
   const { data: menu = [], isLoading } = useQuery<MenuCategory[]>({
     queryKey: ['menu'],
-    queryFn: fetchFullMenu,
+    queryFn: () => fetchFullMenu(true),
   })
 
   const [activeCatId, setActiveCatId] = useState<string | null>(null)
@@ -56,33 +94,27 @@ export default function OrderEntryPage() {
     ? menu.find((c) => c.id === activeCatId)
     : menu[0]
 
-  function addToCart(menuItem: MenuItem, variantId: string | null, price: number, label: string | null) {
-    const key = menuItem.id + (variantId ?? '')
+  function addToCart(menuItem: MenuItem, variant: MenuItemVariant) {
+    const key = menuItem.id + variant.id
     setCart((prev) => {
       const existing = prev.find((c) => c.id === key)
       if (existing) return prev.map((c) => c.id === key ? { ...c, qty: c.qty + 1 } : c)
       return [...prev, {
         id: key,
         menuItemId: menuItem.id,
-        variantId,
+        variantId: variant.id,
         name: menuItem.name,
-        variantLabel: label,
-        price,
+        variantLabel: menuItem.variants.length > 1 ? variant.label : null,
+        price: variant.price,
         qty: 1,
       }]
     })
   }
 
-  function handleAddItem(menuItem: MenuItem) {
-    if (menuItem.is_market_price) return  // TODO: price input modal
-    if (menuItem.variants.length > 1) {
-      // Add all as half (default) — TODO: variant picker modal
-      const def = menuItem.variants.find((v) => v.is_default) ?? menuItem.variants[0]
-      addToCart(menuItem, def.id, def.price, def.label)
-    } else {
-      const v = menuItem.variants[0]
-      addToCart(menuItem, v?.id ?? null, v?.price ?? 0, null)
-    }
+  function handleSingleAdd(menuItem: MenuItem) {
+    if (menuItem.is_market_price) return
+    const def = menuItem.variants.find((v) => v.is_default) ?? menuItem.variants[0]
+    if (def) addToCart(menuItem, def)
   }
 
   function updateQty(key: string, delta: number) {
@@ -167,41 +199,38 @@ export default function OrderEntryPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredItems.map((menuItem) => {
-              const price = defaultPrice(menuItem)
               const hasVariants = menuItem.variants.length > 1
 
               return (
                 <div
                   key={menuItem.id}
-                  className="group relative flex items-center gap-4 bg-surface-container-lowest rounded-xl p-5 shadow-card hover:shadow-card-hover transition-all duration-300 cursor-pointer"
-                  onClick={() => handleAddItem(menuItem)}
+                  className={`group relative flex items-start gap-4 bg-surface-container-lowest rounded-xl p-5 shadow-card hover:shadow-card-hover transition-all duration-300 ${!hasVariants ? 'cursor-pointer' : ''}`}
+                  onClick={() => !hasVariants && handleSingleAdd(menuItem)}
                 >
                   {/* Veg/Non-veg indicator */}
-                  <div className={`w-5 h-5 rounded-sm border-2 flex items-center justify-center shrink-0 ${menuItem.is_veg ? 'border-green-600' : 'border-red-600'}`}>
+                  <div className={`w-5 h-5 rounded-sm border-2 flex items-center justify-center shrink-0 mt-0.5 ${menuItem.is_veg ? 'border-green-600' : 'border-red-600'}`}>
                     <div className={`w-2.5 h-2.5 rounded-full ${menuItem.is_veg ? 'bg-green-600' : 'bg-red-600'}`} />
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-primary text-sm leading-tight">{menuItem.name}</h3>
-                    {hasVariants && (
-                      <p className="text-xs text-on-surface-variant mt-0.5">
-                        {menuItem.variants.map((v) => `${v.label} ₹${v.price}`).join(' / ')}
-                      </p>
-                    )}
-                    {menuItem.is_market_price && (
-                      <p className="text-xs text-amber-600 font-medium mt-0.5">Market price</p>
-                    )}
-                  </div>
 
-                  {/* Price + Add */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    {!menuItem.is_market_price && (
-                      <span className="font-bold text-primary text-sm">₹{price}</span>
+                    {menuItem.is_market_price ? (
+                      <p className="text-xs text-amber-600 font-medium mt-1">Market price</p>
+                    ) : hasVariants ? (
+                      // Inline variant picker for half/full items
+                      <VariantPicker item={menuItem} onAdd={(v) => addToCart(menuItem, v)} />
+                    ) : (
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="font-bold text-primary text-sm">
+                          ₹{menuItem.variants[0]?.price ?? 0}
+                        </span>
+                        <button className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center text-primary/40 group-hover:text-primary group-hover:border-primary transition-colors">
+                          <span className="material-symbols-outlined text-sm">add</span>
+                        </button>
+                      </div>
                     )}
-                    <button className="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center text-primary/40 group-hover:text-primary group-hover:border-primary transition-colors">
-                      <span className="material-symbols-outlined text-sm">add</span>
-                    </button>
                   </div>
                 </div>
               )
