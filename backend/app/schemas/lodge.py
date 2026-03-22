@@ -95,6 +95,7 @@ class BookingCreate(BaseModel):
     expected_check_out: datetime
     num_guests: int = 1
     advance_paid: float = 0.0
+    ac_used: bool = True        # customer's AC preference — affects nightly rate
 
 
 class CheckOutRequest(BaseModel):
@@ -132,6 +133,8 @@ class BookingRead(BaseModel):
     check_out_at: Optional[datetime]
     num_guests: int
     advance_paid: float
+    ac_used: bool
+    nightly_rate: float
     status: BookingStatus
     created_at: datetime
     guest: GuestRead

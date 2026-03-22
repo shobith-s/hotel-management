@@ -1,114 +1,76 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
+import { fetchRooms, fetchRoomTypes, Room } from '../api/lodge'
 
-type HKStatus = 'clean' | 'dirty' | 'service' | 'occupied'
-
-interface RoomCard {
-  number: string
-  type: string
-  status: HKStatus
-  guest?: string
-  lastCheckout?: string
-}
-
-const floor1: RoomCard[] = [
-  { number: '101', type: 'King Suite', status: 'clean' },
-  { number: '102', type: 'Twin Room', status: 'dirty', lastCheckout: '12:00' },
-  { number: '103', type: 'Deluxe King', status: 'occupied', guest: 'Mr. R. Sharma' },
-  { number: '104', type: 'Standard Single', status: 'clean' },
-  { number: '105', type: 'Junior Suite', status: 'service' },
-]
-
-const floor2: RoomCard[] = [
-  { number: '201', type: 'Penthouse', status: 'clean' },
-  { number: '202', type: 'Executive Suite', status: 'occupied', guest: 'Dr. Anita Gupta' },
-  { number: '203', type: 'Executive Suite', status: 'clean' },
-  { number: '204', type: 'Presidential', status: 'dirty' },
-  { number: '205', type: 'Honeymoon Suite', status: 'clean' },
-]
-
-const bookings = [
-  { guest: 'Vikram Singh', room: '103', checkIn: 'Oct 12, 14:00', checkOut: 'Oct 15, 11:00', amount: '₹12,400', status: 'confirmed' },
-  { guest: 'Sarah Jenkins', room: '202', checkIn: 'Oct 11, 16:30', checkOut: 'Oct 14, 10:00', amount: '₹24,000', status: 'in_stay' },
-  { guest: 'Karthik Raja', room: '108', checkIn: 'Oct 10, 11:15', checkOut: 'Oct 12, 12:00', amount: '₹8,500', status: 'checked_out' },
-]
-
-const hkBadge: Record<HKStatus, string> = {
+const hkBadge: Record<string, string> = {
   clean: 'bg-emerald-100 text-emerald-700',
   dirty: 'bg-amber-100 text-amber-700',
-  service: 'bg-rose-100 text-rose-700',
-  occupied: 'bg-primary-container text-white',
+  in_service: 'bg-rose-100 text-rose-700',
 }
-const hkLabel: Record<HKStatus, string> = {
+const hkLabel: Record<string, string> = {
   clean: 'Clean',
   dirty: 'Dirty',
-  service: 'Service',
-  occupied: 'Occupied',
-}
-const bookingBadge: Record<string, string> = {
-  confirmed: 'bg-emerald-50 text-emerald-700',
-  in_stay: 'bg-secondary-container text-on-secondary-container',
-  checked_out: 'bg-surface-variant text-on-surface-variant',
-}
-const bookingLabel: Record<string, string> = {
-  confirmed: 'Confirmed',
-  in_stay: 'In-Stay',
-  checked_out: 'Checked Out',
+  in_service: 'Service',
 }
 
-function RoomGrid({ rooms, floor, wing }: { rooms: RoomCard[]; floor: string; wing: string }) {
+function RoomCard({ room }: { room: Room }) {
+  const isOccupied = room.status === 'occupied'
   return (
-    <section>
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-2xl font-headline text-primary">
-          Floor {floor}{' '}
-          <span className="text-sm font-sans font-normal text-on-surface-variant ml-2 italic">{wing}</span>
-        </h3>
-        {floor === '1' && (
-          <div className="flex gap-4">
-            {[['emerald', 'Clean'], ['amber', 'Dirty'], ['rose', 'Service']].map(([color, label]) => (
-              <span key={label} className="flex items-center gap-1 text-xs font-bold uppercase">
-                <span className={`w-2 h-2 rounded-full bg-${color}-500`} />
-                {label}
-              </span>
-            ))}
-          </div>
+    <div className={`p-5 rounded-xl cursor-pointer transition-all ${
+      isOccupied
+        ? 'bg-primary border-2 border-primary/20 shadow-inner'
+        : 'bg-surface-container-lowest border border-outline-variant/15 hover:shadow-xl'
+    }`}>
+      <div className="flex justify-between items-start mb-4">
+        <span className={`text-xl font-bold font-headline ${isOccupied ? 'text-on-primary' : 'text-primary'}`}>
+          {room.room_number}
+        </span>
+        {isOccupied ? (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-primary-container text-on-primary-container">
+            Occupied
+          </span>
+        ) : (
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${hkBadge[room.housekeeping] ?? 'bg-surface-variant text-on-surface-variant'}`}>
+            {hkLabel[room.housekeeping] ?? room.housekeeping}
+          </span>
         )}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {rooms.map((room) => (
-          <div
-            key={room.number}
-            className={`p-5 rounded-xl cursor-pointer transition-all ${
-              room.status === 'occupied'
-                ? 'bg-surface border-2 border-primary/20 shadow-inner'
-                : 'bg-surface-container-lowest border border-outline-variant/15 hover:shadow-xl'
-            }`}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <span className="text-xl font-bold font-headline">{room.number}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${hkBadge[room.status]}`}>
-                {hkLabel[room.status]}
-              </span>
-            </div>
-            <p className={`text-xs ${room.status === 'occupied' ? 'text-white/60' : 'text-on-surface-variant'}`}>
-              {room.type}
-            </p>
-            {room.guest && (
-              <p className="mt-4 text-[11px] font-bold text-primary">{room.guest}</p>
-            )}
-            {room.lastCheckout && (
-              <div className="mt-4">
-                <span className="text-[10px] text-on-surface-variant">Last checkout: {room.lastCheckout}</span>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
+      <p className={`text-xs ${isOccupied ? 'text-on-primary/70' : 'text-on-surface-variant'}`}>
+        {room.room_type.name}
+      </p>
+      <p className={`text-xs mt-1 font-medium ${isOccupied ? 'text-on-primary/60' : 'text-on-surface-variant/60'}`}>
+        Floor {room.floor} · ₹{room.room_type.base_rate}/night
+      </p>
+    </div>
   )
 }
 
 export default function LodgePage() {
+  const [acUsed, setAcUsed] = useState(true)
+
+  const { data: rooms = [], isLoading } = useQuery<Room[]>({
+    queryKey: ['rooms'],
+    queryFn: fetchRooms,
+    refetchInterval: 30000,
+  })
+
+  const { data: roomTypes = [] } = useQuery({
+    queryKey: ['room-types'],
+    queryFn: fetchRoomTypes,
+  })
+
+  const floor1 = rooms.filter((r) => r.floor === 1)
+  const floor2 = rooms.filter((r) => r.floor === 2)
+
+  const availableCount = rooms.filter((r) => r.status === 'available').length
+  const occupiedCount = rooms.filter((r) => r.status === 'occupied').length
+  const dirtyCount = rooms.filter((r) => r.housekeeping === 'dirty').length
+
+  const acType = roomTypes.find((t) => t.name === 'AC Room')
+  const nonAcType = roomTypes.find((t) => t.name === 'Non-AC Room')
+  const selectedRate = acUsed ? acType?.base_rate : nonAcType?.base_rate
+
   return (
     <div className="min-h-screen">
       <TopBar title="Lodge Management" />
@@ -119,14 +81,16 @@ export default function LodgePage() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-6">
             {[
-              { label: 'Available', count: '12', icon: 'check_circle', color: 'text-emerald-500' },
-              { label: 'Occupied', count: '28', icon: 'bed', color: 'text-primary-fixed-dim' },
-              { label: 'Service', count: '04', icon: 'cleaning_services', color: 'text-error' },
+              { label: 'Available', count: availableCount, icon: 'check_circle', color: 'text-emerald-500' },
+              { label: 'Occupied', count: occupiedCount, icon: 'bed', color: 'text-primary' },
+              { label: 'Needs Cleaning', count: dirtyCount, icon: 'cleaning_services', color: 'text-error' },
             ].map((stat) => (
               <div key={stat.label} className="bg-surface-container-low p-6 rounded-xl flex items-center justify-between">
                 <div>
                   <p className="text-xs text-on-surface-variant uppercase tracking-widest font-bold">{stat.label}</p>
-                  <h3 className="text-3xl font-headline text-primary">{stat.count}</h3>
+                  <h3 className="text-3xl font-headline text-primary">
+                    {isLoading ? '—' : stat.count}
+                  </h3>
                 </div>
                 <span className={`material-symbols-outlined text-4xl opacity-40 ${stat.color}`}>
                   {stat.icon}
@@ -135,55 +99,101 @@ export default function LodgePage() {
             ))}
           </div>
 
-          <RoomGrid rooms={floor1} floor="1" wing="Standard Suites" />
-          <RoomGrid rooms={floor2} floor="2" wing="Executive Wing" />
+          {/* Legend */}
+          <div className="flex items-center gap-6 text-xs font-bold uppercase">
+            {[['emerald', 'Clean'], ['amber', 'Dirty'], ['rose', 'Service']].map(([color, label]) => (
+              <span key={label} className="flex items-center gap-1.5">
+                <span className={`w-2.5 h-2.5 rounded-full bg-${color}-500`} />
+                {label}
+              </span>
+            ))}
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-primary" />
+              Occupied
+            </span>
+          </div>
 
-          {/* Recent Bookings */}
-          <section className="bg-surface-container-lowest rounded-2xl p-8 shadow-card border border-outline-variant/10">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-headline text-primary">Recent Bookings</h3>
-              <button className="text-sm font-bold text-primary border-b border-primary/20 hover:border-primary transition-all">
-                View All History
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-outline-variant/20">
-                    {['Guest Name', 'Room', 'Check In', 'Check Out', 'Amount', 'Status'].map((h) => (
-                      <th key={h} className="pb-4 font-bold text-xs uppercase tracking-widest text-on-surface-variant">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/10">
-                  {bookings.map((b, i) => (
-                    <tr key={i} className="hover:bg-surface-container-low transition-colors">
-                      <td className="py-4 font-medium">{b.guest}</td>
-                      <td className="py-4">{b.room}</td>
-                      <td className="py-4 text-sm text-on-surface-variant">{b.checkIn}</td>
-                      <td className="py-4 text-sm text-on-surface-variant">{b.checkOut}</td>
-                      <td className="py-4 font-bold">{b.amount}</td>
-                      <td className="py-4">
-                        <span className={`px-3 py-1 rounded-full text-[11px] font-bold ${bookingBadge[b.status]}`}>
-                          {bookingLabel[b.status]}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          {isLoading ? (
+            <div className="text-sm text-on-surface-variant animate-pulse">Loading rooms…</div>
+          ) : (
+            <>
+              {floor1.length > 0 && (
+                <section>
+                  <h3 className="text-2xl font-headline text-primary mb-6">
+                    Floor 1
+                    <span className="text-sm font-sans font-normal text-on-surface-variant ml-3 italic">
+                      Rooms 101–105
+                    </span>
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {floor1.map((r) => <RoomCard key={r.id} room={r} />)}
+                  </div>
+                </section>
+              )}
+
+              {floor2.length > 0 && (
+                <section>
+                  <h3 className="text-2xl font-headline text-primary mb-6">
+                    Floor 2
+                    <span className="text-sm font-sans font-normal text-on-surface-variant ml-3 italic">
+                      Rooms 201–208
+                    </span>
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {floor2.map((r) => <RoomCard key={r.id} room={r} />)}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
         </div>
 
-        {/* Right: Quick Registration */}
+        {/* Right: Quick Check-In */}
         <aside className="w-96 shrink-0">
-          <div className="sticky top-24 bg-surface-container-low rounded-3xl p-8 border border-outline-variant/15">
-            <h3 className="text-2xl font-headline text-primary mb-2">Quick Check-In</h3>
-            <p className="text-sm text-on-surface-variant mb-8">Register a walk-in guest instantly.</p>
-            <form className="space-y-6">
+          <div className="sticky top-24 bg-surface-container-low rounded-3xl p-8 border border-outline-variant/15 space-y-6">
+            <div>
+              <h3 className="text-2xl font-headline text-primary mb-1">Quick Check-In</h3>
+              <p className="text-sm text-on-surface-variant">Register a walk-in guest instantly.</p>
+            </div>
+
+            {/* AC / Non-AC Toggle */}
+            <div className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/10">
+              <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-3">
+                AC Preference
+              </p>
+              <div className="flex rounded-full overflow-hidden border border-outline-variant/20">
+                <button
+                  onClick={() => setAcUsed(true)}
+                  className={`flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                    acUsed
+                      ? 'bg-primary text-on-primary'
+                      : 'text-on-surface-variant hover:bg-surface-container-high'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">ac_unit</span>
+                  AC
+                </button>
+                <button
+                  onClick={() => setAcUsed(false)}
+                  className={`flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                    !acUsed
+                      ? 'bg-primary text-on-primary'
+                      : 'text-on-surface-variant hover:bg-surface-container-high'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">wind_power</span>
+                  Non-AC
+                </button>
+              </div>
+              {selectedRate && (
+                <p className="text-xs text-on-surface-variant mt-3 text-center">
+                  Rate: <span className="font-bold text-primary">₹{selectedRate}/night</span>
+                  <span className="ml-1 text-on-surface-variant/60">+ 12% GST</span>
+                </p>
+              )}
+            </div>
+
+            <form className="space-y-5">
               {[
                 { label: 'Guest Full Name', placeholder: 'e.g. Rahul Verma', type: 'text' },
                 { label: 'Contact Number', placeholder: '+91 98XXX XXXXX', type: 'tel' },
@@ -192,72 +202,58 @@ export default function LodgePage() {
                   <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     {field.label}
                   </label>
-                  <input
-                    type={field.type}
-                    placeholder={field.placeholder}
-                    className="input-minimal"
-                  />
+                  <input type={field.type} placeholder={field.placeholder} className="input-minimal" />
                 </div>
               ))}
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                  Room Category
+                  Room
                 </label>
                 <select className="input-minimal appearance-none">
-                  <option>Executive Suite</option>
-                  <option>Deluxe King</option>
-                  <option>Twin Room</option>
-                  <option>Penthouse</option>
+                  <option value="">Select a room…</option>
+                  {rooms
+                    .filter((r) => r.status === 'available')
+                    .map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Room {r.room_number} — Floor {r.floor}
+                      </option>
+                    ))}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Nights
                   </label>
-                  <input type="number" defaultValue={1} className="input-minimal" />
+                  <input type="number" defaultValue={1} min={1} className="input-minimal" />
                 </div>
                 <div className="space-y-1">
                   <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                    Pax
+                    Guests
                   </label>
-                  <input type="number" defaultValue={2} className="input-minimal" />
+                  <input type="number" defaultValue={1} min={1} className="input-minimal" />
                 </div>
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                  ID Verification
+                  Advance Payment (₹)
                 </label>
-                <div className="mt-2 border-2 border-dashed border-outline-variant/30 rounded-xl p-6 text-center hover:bg-surface-container-highest transition-colors cursor-pointer">
-                  <span className="material-symbols-outlined text-primary/40 block mb-2">upload_file</span>
-                  <p className="text-xs text-on-surface-variant">Upload Aadhaar / Passport</p>
-                </div>
+                <input type="number" defaultValue={0} min={0} placeholder="0" className="input-minimal" />
               </div>
 
-              <div className="pt-4">
+              <div className="pt-2">
                 <button
                   type="submit"
                   className="w-full btn-primary py-4 px-6 flex items-center justify-center gap-2"
                 >
-                  <span>Complete Check-in</span>
+                  <span>Complete Check-In</span>
                   <span className="material-symbols-outlined">arrow_forward</span>
                 </button>
               </div>
             </form>
-
-            {/* Alert banner */}
-            <div className="mt-10 p-4 bg-primary-fixed/30 rounded-2xl flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-white">restaurant_menu</span>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-primary">Dinner Rush Impending</p>
-                <p className="text-[10px] text-on-surface-variant">14 table bookings in 2 hours.</p>
-              </div>
-            </div>
           </div>
         </aside>
       </div>

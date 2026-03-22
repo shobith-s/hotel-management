@@ -119,7 +119,15 @@ def check_in(db: Session, data: BookingCreate, checked_in_by: uuid.UUID) -> Book
         raise HTTPException(400, f"Room {room.room_number} is not available (status: {room.status.value})")
     get_guest(db, data.guest_id)
 
-    booking = Booking(checked_in_by=checked_in_by, **data.model_dump())
+    # Resolve nightly rate: find matching room type for AC/Non-AC preference
+    from app.models.lodge import RoomType
+    target_type_name = "AC Room" if data.ac_used else "Non-AC Room"
+    rate_type = db.query(RoomType).filter(RoomType.name == target_type_name).first()
+    nightly_rate = rate_type.base_rate if rate_type else room.room_type.base_rate
+
+    payload = data.model_dump()
+    payload["nightly_rate"] = nightly_rate
+    booking = Booking(checked_in_by=checked_in_by, **payload)
     db.add(booking)
     db.flush()
 
@@ -172,8 +180,10 @@ def check_out(db: Session, booking_id: uuid.UUID, data: CheckOutRequest) -> dict
     check_out_at = data.check_out_at or datetime.utcnow()
     nights = _calculate_nights(booking.check_in_at, check_out_at)
     room_type = booking.room.room_type
+    rate = booking.nightly_rate if booking.nightly_rate else room_type.base_rate
+    ac_label = "AC" if booking.ac_used else "Non-AC"
 
-    room_charge = Decimal(str(room_type.base_rate)) * nights
+    room_charge = Decimal(str(rate)) * nights
     gst_amount = (room_charge * Decimal(str(room_type.gst_rate)) / 100).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
@@ -181,7 +191,7 @@ def check_out(db: Session, booking_id: uuid.UUID, data: CheckOutRequest) -> dict
     room_charge_entry = BookingCharge(
         booking_id=booking.id,
         charge_type=ChargeType.room,
-        description=f"Room {booking.room.room_number} — {nights} night(s) @ ₹{room_type.base_rate}/night",
+        description=f"Room {booking.room.room_number} ({ac_label}) — {nights} night(s) @ ₹{rate}/night",
         amount=float(room_charge),
     )
     db.add(room_charge_entry)
@@ -202,6 +212,8 @@ def check_out(db: Session, booking_id: uuid.UUID, data: CheckOutRequest) -> dict
         "booking": booking,
         "nights": nights,
         "room_charge": float(room_charge),
+        "nightly_rate": float(rate),
+        "ac_used": booking.ac_used,
         "gst_rate": room_type.gst_rate,
         "gst_amount": float(gst_amount),
         "other_charges": float(total_charges - room_charge),

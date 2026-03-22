@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, List, Optional
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Enum as SAEnum, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, Enum as SAEnum, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -67,6 +67,8 @@ class Booking(Base):
     check_out_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     num_guests: Mapped[int] = mapped_column(default=1)
     advance_paid: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    ac_used: Mapped[bool] = mapped_column(Boolean, default=True)
+    nightly_rate: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     status: Mapped[BookingStatus] = mapped_column(SAEnum(BookingStatus), default=BookingStatus.active)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
