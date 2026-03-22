@@ -81,11 +81,11 @@ export default function DashboardPage() {
               Lodge Occupancy
             </h3>
             <div className="flex items-end gap-2">
-              <div className="font-headline text-5xl font-bold">{occupancyPct}%</div>
-              <div className="text-on-primary-container text-sm mb-2">/ {rooms.length} rooms</div>
+              <div className="font-headline text-5xl font-bold">{rooms.length - roomsOccupied}</div>
+              <div className="text-on-primary-container text-sm mb-2">/ {rooms.length} available</div>
             </div>
             <div className="mt-6 w-full bg-primary-container h-1.5 rounded-full">
-              <div className="bg-primary-fixed h-full rounded-full" style={{ width: `${occupancyPct}%` }} />
+              <div className="bg-primary-fixed h-full rounded-full" style={{ width: `${100 - occupancyPct}%` }} />
             </div>
           </div>
 
