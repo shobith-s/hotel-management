@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import { fetchTables, Table } from '../api/tables'
+import { fetchRooms } from '../api/lodge'
 
 const statusBadge: Record<string, string> = {
   available: 'badge-available',
@@ -23,8 +24,16 @@ export default function DashboardPage() {
     refetchInterval: 15000, // refresh every 15s
   })
 
+  const { data: rooms = [] } = useQuery({
+    queryKey: ['rooms'],
+    queryFn: fetchRooms,
+    refetchInterval: 15000,
+  })
+
   const occupiedCount = tables.filter((t) => t.status === 'occupied' || t.status === 'bill_requested').length
   const availableCount = tables.filter((t) => t.status === 'available').length
+  const roomsOccupied = rooms.filter((r) => r.status === 'occupied').length
+  const occupancyPct = rooms.length ? Math.round((roomsOccupied / rooms.length) * 100) : 0
 
   return (
     <div className="min-h-screen">
@@ -61,7 +70,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Lodge Occupancy — static until lodge module is live */}
+          {/* Lodge Occupancy */}
           <div className="bg-primary text-on-primary p-8 rounded-xl shadow-[0_20px_40px_rgba(54,31,26,0.1)] relative overflow-hidden">
             <div className="flex justify-between items-start mb-4">
               <div className="p-3 bg-primary-container rounded-lg">
@@ -72,11 +81,11 @@ export default function DashboardPage() {
               Lodge Occupancy
             </h3>
             <div className="flex items-end gap-2">
-              <div className="font-headline text-5xl font-bold">—</div>
-              <div className="text-on-primary-container text-sm mb-2">rooms</div>
+              <div className="font-headline text-5xl font-bold">{occupancyPct}%</div>
+              <div className="text-on-primary-container text-sm mb-2">/ {rooms.length} rooms</div>
             </div>
             <div className="mt-6 w-full bg-primary-container h-1.5 rounded-full">
-              <div className="bg-primary-fixed h-full rounded-full" style={{ width: '0%' }} />
+              <div className="bg-primary-fixed h-full rounded-full" style={{ width: `${occupancyPct}%` }} />
             </div>
           </div>
 
