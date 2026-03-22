@@ -140,3 +140,17 @@ class BookingRead(BaseModel):
     guest: GuestRead
     room: RoomRead
     charges: List[BookingChargeRead] = []
+
+
+class CheckoutResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    booking: BookingRead
+    nights: int
+    room_charge: float
+    nightly_rate: float
+    ac_used: bool
+    gst_rate: float
+    gst_amount: float
+    other_charges: float
+    grand_total: float

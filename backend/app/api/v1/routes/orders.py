@@ -1,13 +1,14 @@
 import uuid
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_roles
-from app.models.enums import UserRole
+from app.models.enums import OrderStatus, UserRole
+from app.models.order import Order
 from app.schemas.audit import OrderAuditLogRead
 from app.schemas.order import (
     AddItemsRequest, OrderCreate, OrderItemRead, OrderItemUpdate, OrderRead, VoidItemRequest,
@@ -25,6 +26,17 @@ class CancelRequest(BaseModel):
 
 
 # ── Order CRUD ────────────────────────────────────────────────────────────────
+
+@router.get("/", response_model=List[OrderRead], dependencies=[_all_staff])
+def list_orders(
+    status: Optional[OrderStatus] = Query(None),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Order)
+    if status:
+        q = q.filter(Order.status == status)
+    return q.order_by(Order.created_at.asc()).all()
+
 
 @router.post("/", response_model=OrderRead)
 def create_order(data: OrderCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):

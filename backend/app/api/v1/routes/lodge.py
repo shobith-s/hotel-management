@@ -9,7 +9,7 @@ from app.core.security import get_current_user, require_roles
 from app.models.enums import HousekeepingStatus, RoomStatus, UserRole
 from app.schemas.lodge import (
     BookingChargeCreate, BookingChargeRead, BookingCreate, BookingRead,
-    CheckOutRequest, GuestCreate, GuestRead,
+    CheckOutRequest, CheckoutResponse, GuestCreate, GuestRead,
     RoomCreate, RoomRead, RoomTypeCreate, RoomTypeRead, RoomTypeUpdate, RoomUpdate,
 )
 from app.services import lodge as lodge_svc
@@ -109,7 +109,7 @@ def add_charge(booking_id: uuid.UUID, data: BookingChargeCreate, db: Session = D
     return lodge_svc.add_booking_charge(db, booking_id, data)
 
 
-@router.post("/bookings/{booking_id}/checkout", dependencies=[_front_desk])
+@router.post("/bookings/{booking_id}/checkout", response_model=CheckoutResponse, dependencies=[_front_desk])
 def check_out(
     booking_id: uuid.UUID,
     data: CheckOutRequest,
