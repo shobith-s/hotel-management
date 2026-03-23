@@ -1,4 +1,3 @@
-import traceback
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -93,12 +92,7 @@ def _hotel_header() -> str:
 
 @router.get("/bill/{bill_id}", response_class=HTMLResponse)
 def print_bill(bill_id: uuid.UUID, token: str = Query(...), db: Session = Depends(get_db)):
-    try:
-        return _render_bill(bill_id, token, db)
-    except HTTPException:
-        raise
-    except Exception:
-        return HTMLResponse(f"<pre style='padding:24px;font-size:13px'>{traceback.format_exc()}</pre>", status_code=500)
+    return _render_bill(bill_id, token, db)
 
 
 def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
@@ -233,12 +227,7 @@ def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
 
 @router.get("/lodge/{booking_id}", response_class=HTMLResponse)
 def print_lodge_receipt(booking_id: uuid.UUID, token: str = Query(...), db: Session = Depends(get_db)):
-    try:
-        return _render_lodge(booking_id, token, db)
-    except HTTPException:
-        raise
-    except Exception:
-        return HTMLResponse(f"<pre style='padding:24px;font-size:13px'>{traceback.format_exc()}</pre>", status_code=500)
+    return _render_lodge(booking_id, token, db)
 
 
 def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
