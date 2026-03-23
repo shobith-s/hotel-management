@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
-import { getRevenueSummary, type RevenueReport } from '../api/reports'
+import { getRevenueSummary, type RevenueReport, type TopItem } from '../api/reports'
 
 // ── Date helpers (same pattern as LodgePage) ──────────────────────────────────
 
@@ -71,6 +71,23 @@ function StatCard({ icon, label, value, sub, color = 'text-primary' }: {
       </div>
       <p className={`font-headline text-3xl font-bold ${color}`}>{value}</p>
       {sub && <p className="text-xs text-on-surface-variant">{sub}</p>}
+    </div>
+  )
+}
+
+// ── Top item row ──────────────────────────────────────────────────────────────
+
+function TopItemRow({ item, rank, maxRevenue }: { item: TopItem; rank: number; maxRevenue: number }) {
+  const pct = maxRevenue > 0 ? (item.revenue / maxRevenue) * 100 : 0
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xs font-bold text-on-surface-variant w-5 text-right">{rank}</span>
+      <span className="flex-1 text-sm font-medium text-primary truncate">{item.name}</span>
+      <span className="text-xs text-on-surface-variant w-16 text-right">{item.quantity_sold} sold</span>
+      <div className="w-24 bg-surface-container-low rounded-full h-2">
+        <div className="bg-secondary rounded-full h-2 transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-sm font-bold text-primary w-24 text-right">₹{item.revenue.toLocaleString('en-IN')}</span>
     </div>
   )
 }
@@ -178,7 +195,7 @@ export default function ReportsPage() {
                 icon="restaurant"
                 label="Restaurant"
                 value={`₹${data.restaurant_revenue.toLocaleString('en-IN')}`}
-                sub={`${data.total_bills} bill${data.total_bills !== 1 ? 's' : ''}`}
+                sub={`${data.total_bills} bill${data.total_bills !== 1 ? 's' : ''} · avg ₹${data.avg_spend_per_bill.toLocaleString('en-IN')}`}
               />
               <StatCard
                 icon="bed"
@@ -195,20 +212,60 @@ export default function ReportsPage() {
               />
             </div>
 
-            {/* Payment mode breakdown */}
-            <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card">
-              <h2 className="font-headline text-lg font-bold text-primary mb-5">Payment Mode Breakdown</h2>
-              {paymentTotal === 0 ? (
-                <p className="text-sm text-on-surface-variant text-center py-6">No paid bills in this date range</p>
-              ) : (
-                <div className="space-y-4">
-                  {Object.entries(data.payment_modes)
-                    .sort(([, a], [, b]) => b - a)
-                    .map(([mode, amount]) => (
-                      <PaymentRow key={mode} mode={mode} amount={amount} total={paymentTotal} />
+            {/* Second row: discount + void */}
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <StatCard
+                icon="local_offer"
+                label="Total Discounts"
+                value={`₹${data.total_discount.toLocaleString('en-IN')}`}
+                sub="Applied across all bills"
+                color="text-secondary"
+              />
+              <StatCard
+                icon="cancel"
+                label="Voided Items"
+                value={String(data.void_summary.count)}
+                sub={`₹${data.void_summary.value.toLocaleString('en-IN')} lost revenue`}
+                color="text-error"
+              />
+            </div>
+
+            {/* Top 10 items + Payment mode side by side */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Top 10 selling items */}
+              <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card">
+                <h2 className="font-headline text-lg font-bold text-primary mb-5">Top Selling Items</h2>
+                {data.top_items.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant text-center py-6">No sales data in this range</p>
+                ) : (
+                  <div className="space-y-4">
+                    {data.top_items.map((item, i) => (
+                      <TopItemRow
+                        key={item.name}
+                        item={item}
+                        rank={i + 1}
+                        maxRevenue={data.top_items[0]?.revenue ?? 1}
+                      />
                     ))}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
+
+              {/* Payment mode breakdown */}
+              <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card">
+                <h2 className="font-headline text-lg font-bold text-primary mb-5">Payment Mode Breakdown</h2>
+                {paymentTotal === 0 ? (
+                  <p className="text-sm text-on-surface-variant text-center py-6">No paid bills in this date range</p>
+                ) : (
+                  <div className="space-y-4">
+                    {Object.entries(data.payment_modes)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([mode, amount]) => (
+                        <PaymentRow key={mode} mode={mode} amount={amount} total={paymentTotal} />
+                      ))}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

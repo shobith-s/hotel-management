@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import { fetchFullMenu, MenuCategory } from '../api/menu'
@@ -8,10 +8,23 @@ function toggleItem(itemId: string) {
   return api.post(`/menu/items/${itemId}/toggle`)
 }
 
+interface CsvImportResult { imported: number; skipped: number; errors: string[] }
+
+async function importMenuCsv(file: File): Promise<CsvImportResult> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await api.post<CsvImportResult>('/menu/import-csv', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}
+
 export default function MenuPage() {
   const qc = useQueryClient()
   const [activeCatId, setActiveCatId] = useState<string | null>(null)
   const [vegFilter, setVegFilter] = useState<'all' | 'veg' | 'nonveg'>('all')
+  const [csvResult, setCsvResult] = useState<CsvImportResult | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: menu = [], isLoading } = useQuery<MenuCategory[]>({
     queryKey: ['menu', 'all'],
@@ -21,6 +34,14 @@ export default function MenuPage() {
   const toggleMutation = useMutation({
     mutationFn: toggleItem,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['menu', 'all'] }),
+  })
+
+  const csvMutation = useMutation({
+    mutationFn: importMenuCsv,
+    onSuccess: (result) => {
+      setCsvResult(result)
+      qc.invalidateQueries({ queryKey: ['menu'] })
+    },
   })
 
   const activeCategory = activeCatId
@@ -91,6 +112,52 @@ export default function MenuPage() {
               ))}
             </div>
           </div>
+
+          {/* CSV Import */}
+          <div className="mb-6 bg-surface-container-lowest rounded-2xl p-5 shadow-card flex items-center gap-4 flex-wrap">
+            <span className="material-symbols-outlined text-on-surface-variant">upload_file</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-primary">Bulk Import via CSV</p>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Columns: <span className="font-mono">category_name, item_name, is_veg, price, gst_rate</span>
+                {' '}· optional: <span className="font-mono">variant_label, is_market_price</span>
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) { setCsvResult(null); csvMutation.mutate(f) }
+                e.target.value = ''
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={csvMutation.isPending}
+              className="px-5 py-2 rounded-full border border-outline-variant text-sm font-bold text-primary hover:bg-surface-container-low transition-colors disabled:opacity-40 flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-base">upload</span>
+              {csvMutation.isPending ? 'Importing…' : 'Choose CSV'}
+            </button>
+          </div>
+
+          {/* CSV result banner */}
+          {csvResult && (
+            <div className={`mb-6 rounded-2xl p-4 text-sm border ${csvResult.errors.length ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+              <p className="font-bold text-primary mb-1">
+                Import complete — {csvResult.imported} added, {csvResult.skipped} skipped
+              </p>
+              {csvResult.errors.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-amber-800">
+                  {csvResult.errors.map((e, i) => <li key={i}>• {e}</li>)}
+                </ul>
+              )}
+              <button onClick={() => setCsvResult(null)} className="mt-2 text-xs text-on-surface-variant underline">Dismiss</button>
+            </div>
+          )}
 
           <div className="card overflow-hidden">
             <table className="w-full text-left">
