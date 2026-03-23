@@ -1,20 +1,17 @@
 import uuid
 from datetime import timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_roles
+from app.core.security import get_current_user_from_query
 from app.models.billing import Bill
 from app.models.enums import BookingStatus, UserRole
 from app.models.lodge import Booking
 
 router = APIRouter(prefix="/print", tags=["Print"])
-
-_all_staff = Depends(get_current_user)
-_front_desk = Depends(require_roles(UserRole.admin, UserRole.manager, UserRole.receptionist))
 
 # ── Hotel constants (admin can configure these via settings page later) ────────
 HOTEL_NAME = "Hotel Sukhsagar (Desi Dhaba)"
@@ -93,8 +90,9 @@ def _hotel_header() -> str:
 
 # ── Restaurant Bill ────────────────────────────────────────────────────────────
 
-@router.get("/bill/{bill_id}", response_class=HTMLResponse, dependencies=[_all_staff])
-def print_bill(bill_id: uuid.UUID, db: Session = Depends(get_db)):
+@router.get("/bill/{bill_id}", response_class=HTMLResponse)
+def print_bill(bill_id: uuid.UUID, token: str = Query(...), db: Session = Depends(get_db)):
+    get_current_user_from_query(token, db)
     bill: Bill | None = (
         db.query(Bill)
         .options(
@@ -229,8 +227,11 @@ def print_bill(bill_id: uuid.UUID, db: Session = Depends(get_db)):
 
 # ── Lodge Checkout Receipt ─────────────────────────────────────────────────────
 
-@router.get("/lodge/{booking_id}", response_class=HTMLResponse, dependencies=[_front_desk])
-def print_lodge_receipt(booking_id: uuid.UUID, db: Session = Depends(get_db)):
+@router.get("/lodge/{booking_id}", response_class=HTMLResponse)
+def print_lodge_receipt(booking_id: uuid.UUID, token: str = Query(...), db: Session = Depends(get_db)):
+    user = get_current_user_from_query(token, db)
+    if user.role not in (UserRole.admin, UserRole.manager, UserRole.receptionist):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     booking: Booking | None = (
         db.query(Booking)
         .options(

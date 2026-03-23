@@ -55,6 +55,18 @@ def decode_token(token: str) -> TokenData:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 
+def get_current_user_from_query(token: str, db: Session):
+    """Used by print routes where the token is passed as a query param."""
+    if is_token_revoked(token):
+        raise HTTPException(status_code=401, detail="Token has been revoked")
+    token_data = decode_token(token)
+    from app.models.user import User
+    user = db.get(User, token_data.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+    return user
+
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     from app.models.user import User
     if is_token_revoked(token):
