@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.audit import OrderAuditLog
-from app.models.enums import AuditAction, OrderStatus, TableStatus, UserRole
+from app.models.enums import AuditAction, OrderSource, OrderStatus, TableStatus, UserRole
 from app.models.menu import MenuItem, MenuItemVariant
 from app.models.order import Order, OrderItem
 from app.models.table import Table

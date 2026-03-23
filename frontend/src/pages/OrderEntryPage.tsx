@@ -647,22 +647,26 @@ export default function OrderEntryPage() {
             </div>
           </div>
           {/* Voice Order Button */}
-          {voiceSupported && (
-            <button
-              onMouseDown={startListening}
-              onMouseUp={stopListening}
-              onTouchStart={startListening}
-              onTouchEnd={stopListening}
-              disabled={sendMutation.isPending || addItemsMutation.isPending}
-              className={`w-full py-4 mb-3 flex items-center justify-center gap-3 rounded-full font-bold text-sm transition-all ${
-                listening
-                  ? 'bg-error text-white shadow-lg scale-105 animate-pulse'
-                  : 'bg-surface-container-high text-primary hover:bg-surface-container border border-outline-variant/30'
-              } disabled:opacity-40`}
-            >
-              <span className="material-symbols-outlined">{listening ? 'mic' : 'mic_none'}</span>
-              {listening ? 'Listening… release when done' : 'Hold to speak order'}
-            </button>
+          <button
+            onMouseDown={startListening}
+            onMouseUp={stopListening}
+            onTouchStart={startListening}
+            onTouchEnd={stopListening}
+            disabled={!voiceSupported || sendMutation.isPending || addItemsMutation.isPending}
+            title={!voiceSupported ? 'Voice input requires Chrome/Edge on localhost or HTTPS' : undefined}
+            className={`w-full py-4 mb-3 flex items-center justify-center gap-3 rounded-full font-bold text-sm transition-all ${
+              listening
+                ? 'bg-error text-white shadow-lg scale-105 animate-pulse'
+                : 'bg-surface-container-high text-primary hover:bg-surface-container border border-outline-variant/30'
+            } disabled:opacity-40`}
+          >
+            <span className="material-symbols-outlined">{listening ? 'mic' : 'mic_none'}</span>
+            {listening ? 'Listening… release when done' : 'Hold to speak order'}
+          </button>
+          {!voiceSupported && (
+            <p className="text-xs text-on-surface-variant mb-3 text-center">
+              Voice requires Chrome/Edge on localhost or HTTPS
+            </p>
           )}
           {voiceError && (
             <p className="text-xs text-error mb-3 text-center">{voiceError}</p>
