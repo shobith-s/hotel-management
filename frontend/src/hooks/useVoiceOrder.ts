@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import Fuse from 'fuse.js'
+import FlexSearch from 'flexsearch'
 import type { MenuCategory, MenuItem, MenuItemVariant } from '../api/menu'
 
 export interface VoiceParsedItem {
@@ -17,28 +17,32 @@ const WORD_NUMS: Record<string, number> = {
   a: 1, an: 1,
 }
 
-function parseQuantity(token: string): number {
-  const n = parseInt(token, 10)
-  if (!isNaN(n)) return n
-  return WORD_NUMS[token.toLowerCase()] ?? 1
-}
+// Filler words to strip before matching
+const FILLER = new Set([
+  'give', 'me', 'i', 'want', 'please', 'order', 'get', 'bring',
+  'some', 'the', 'a', 'an', 'of', 'with', 'and', 'aur', 'ek',
+])
 
-// Extract quantity prefix from a phrase like "two paneer masala"
 function extractQtyAndRest(tokens: string[]): [number, string[]] {
   if (tokens.length === 0) return [1, tokens]
   const first = tokens[0].toLowerCase()
-  const qty = WORD_NUMS[first] ?? parseInt(first, 10)
-  if (!isNaN(qty) && qty > 0) return [qty, tokens.slice(1)]
+  const numVal = parseInt(first, 10)
+  if (!isNaN(numVal) && numVal > 0) return [numVal, tokens.slice(1)]
+  const wordVal = WORD_NUMS[first]
+  if (wordVal) return [wordVal, tokens.slice(1)]
   return [1, tokens]
 }
 
-// Split transcript on conjunctions/separators
 function splitPhrases(transcript: string): string[] {
   return transcript
     .toLowerCase()
     .split(/\band\b|,|;|\bplus\b|\baur\b/)
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+function stripFillers(tokens: string[]): string[] {
+  return tokens.filter((t) => !FILLER.has(t))
 }
 
 export interface UseVoiceOrderResult {
@@ -62,36 +66,42 @@ export function useVoiceOrder(
   const w = typeof window !== 'undefined' ? (window as any) : null
   const supported = !!w && ('SpeechRecognition' in w || 'webkitSpeechRecognition' in w)
 
-  // Build flat list of all menu items for fuzzy search
   const allItems = menu.flatMap((cat) => cat.items)
 
-  const fuse = new Fuse(allItems, {
-    keys: ['name'],
-    threshold: 0.4,
-    includeScore: true,
-  })
+  // Build FlexSearch index — word-level tokenization + phonetic encoding
+  const buildIndex = useCallback(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const index = new (FlexSearch.Index as any)({
+      tokenize: 'forward',   // matches partial words: "pan" → "paneer"
+      encoder: 'soundex',    // phonetic: "panneer" → "paneer"
+    })
+    allItems.forEach((item, i) => index.add(i, item.name))
+    return index
+  }, [menu]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const parseTranscript = useCallback(
     (transcript: string): VoiceParsedItem[] => {
+      const index = buildIndex()
       const phrases = splitPhrases(transcript)
       const parsed: VoiceParsedItem[] = []
 
       for (const phrase of phrases) {
         const tokens = phrase.split(/\s+/).filter(Boolean)
         const [qty, rest] = extractQtyAndRest(tokens)
-        const query = rest.join(' ')
+        const cleaned = stripFillers(rest)
+        const query = cleaned.join(' ')
         if (!query) continue
 
-        const results = fuse.search(query)
+        const results = index.search(query, { limit: 1 }) as number[]
         if (results.length === 0) continue
 
-        const bestItem = results[0].item
-        // Pick default variant
+        const bestItem = allItems[results[0]]
+        if (!bestItem) continue
+
         const variant =
           bestItem.variants.find((v) => v.is_default) ?? bestItem.variants[0]
         if (!variant) continue
 
-        // Merge with existing if same item+variant already added
         const existing = parsed.find(
           (p) => p.menuItem.id === bestItem.id && p.variant.id === variant.id,
         )
@@ -104,18 +114,17 @@ export function useVoiceOrder(
 
       return parsed
     },
-    [menu], // eslint-disable-line react-hooks/exhaustive-deps
+    [buildIndex, allItems],
   )
 
   const startListening = useCallback(() => {
     if (!supported) {
-      setError('Voice input is not supported in this browser. Use Chrome or Edge.')
+      setError('Voice input not supported. Use Chrome or Edge.')
       return
     }
     setError(null)
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SpeechRecognitionCtor = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
+    const SpeechRecognitionCtor = w.SpeechRecognition ?? w.webkitSpeechRecognition
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognition: any = new SpeechRecognitionCtor()
     recognition.lang = 'en-IN'
@@ -138,7 +147,7 @@ export function useVoiceOrder(
 
     recognitionRef.current = recognition
     recognition.start()
-  }, [supported, parseTranscript, onResult])
+  }, [supported, parseTranscript, onResult, w])
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop()
