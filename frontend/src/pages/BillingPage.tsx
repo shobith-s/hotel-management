@@ -4,6 +4,7 @@ import TopBar from '../components/shared/TopBar'
 import { fetchTables, type Table } from '../api/tables'
 import { getActiveOrderForTable, type OrderRead } from '../api/orders'
 import { createBill, getBillByOrder, settlePayment, type BillRead, type PaymentMode } from '../api/billing'
+import { openPrintPage } from '../api/client'
 
 type PaymentOption = { mode: PaymentMode; icon: string; label: string; sub: string }
 
@@ -359,7 +360,7 @@ export default function BillingPage() {
                   )}
                   {bill && bill.payment_status === 'paid' && (
                     <button
-                      onClick={() => window.open(`/api/v1/print/bill/${bill.id}`, '_blank')}
+                      onClick={() => openPrintPage(`/print/bill/${bill.id}`)}
                       className="w-full py-3 flex items-center justify-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
                     >
                       <span className="material-symbols-outlined text-xl">print</span>

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { openPrintPage } from '../api/client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import {
@@ -550,7 +551,7 @@ function CheckoutReceipt({ summary, onDone }: { summary: CheckoutSummary; onDone
 
       <div className="flex gap-3">
         <button
-          onClick={() => window.open(`/api/v1/print/lodge/${summary.booking.id}`, '_blank')}
+          onClick={() => openPrintPage(`/print/lodge/${summary.booking.id}`)}
           className="flex-1 py-3 flex items-center justify-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
         >
           <span className="material-symbols-outlined text-xl">print</span>

@@ -23,6 +23,18 @@ api.interceptors.response.use(
   },
 )
 
+// Fetch an authenticated HTML receipt and open it in a new tab as a Blob URL.
+// window.open() alone doesn't send the Authorization header, so we fetch
+// the HTML via axios (which includes the token) and open the blob instead.
+export async function openPrintPage(path: string) {
+  const res = await api.get<string>(path, { responseType: 'text' })
+  const blob = new Blob([res.data], { type: 'text/html' })
+  const url  = URL.createObjectURL(blob)
+  const win  = window.open(url, '_blank')
+  // Revoke the blob URL once the new tab has loaded to free memory
+  if (win) win.addEventListener('load', () => URL.revokeObjectURL(url))
+}
+
 export async function logout() {
   try {
     await api.post('/auth/logout')
