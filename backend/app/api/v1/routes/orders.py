@@ -30,11 +30,19 @@ class CancelRequest(BaseModel):
 @router.get("/", response_model=List[OrderRead], dependencies=[_all_staff])
 def list_orders(
     status: Optional[OrderStatus] = Query(None),
+    has_unserved: Optional[bool] = Query(None, description="If true, only return orders with at least one unserved, unvoided item"),
     db: Session = Depends(get_db),
 ):
+    from app.models.order import OrderItem
     q = db.query(Order)
     if status:
         q = q.filter(Order.status == status)
+    if has_unserved:
+        q = q.filter(
+            Order.items.any(
+                (OrderItem.is_served == False) & (OrderItem.is_voided == False)  # noqa: E712
+            )
+        )
     return q.order_by(Order.created_at.asc()).all()
 
 

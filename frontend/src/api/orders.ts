@@ -41,8 +41,11 @@ export interface OrderCreate {
   items: OrderItemCreate[]
 }
 
-export async function listOrders(status?: string): Promise<OrderRead[]> {
-  const res = await api.get<OrderRead[]>('/orders/', { params: status ? { status } : undefined })
+export async function listOrders(status?: string, hasUnserved?: boolean): Promise<OrderRead[]> {
+  const params: Record<string, string | boolean> = {}
+  if (status) params.status = status
+  if (hasUnserved) params.has_unserved = true
+  const res = await api.get<OrderRead[]>('/orders/', { params })
   return res.data
 }
 

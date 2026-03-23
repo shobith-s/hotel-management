@@ -24,17 +24,22 @@ api.interceptors.response.use(
 )
 
 // Fetch an authenticated HTML receipt and print it.
-// Opens a new window, writes the HTML directly into it, then triggers
-// the browser's native print dialog (Ctrl+P / Save as PDF).
+// IMPORTANT: window.open() must be called synchronously within the click
+// handler (before any await) — otherwise popup blockers silently block it.
 export async function openPrintPage(path: string) {
-  const res = await api.get<string>(path, { responseType: 'text' })
+  // 1. Open window immediately — still inside the user gesture
   const win = window.open('', '_blank')
   if (!win) return
+  win.document.write('<html><body style="font-family:sans-serif;padding:24px;color:#555">Loading receipt…</body></html>')
+
+  // 2. Fetch HTML with auth token
+  const res = await api.get<string>(path, { responseType: 'text' })
+
+  // 3. Replace placeholder with real receipt and trigger print
   win.document.open()
   win.document.write(res.data)
   win.document.close()
-  // Trigger print once the content has rendered
-  win.onload = () => win.print()
+  setTimeout(() => win.print(), 300)
 }
 
 export async function logout() {

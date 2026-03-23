@@ -148,8 +148,8 @@ export default function KDSPage() {
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
 
   const { data: orders = [], isLoading, dataUpdatedAt } = useQuery<OrderRead[]>({
-    queryKey: ['orders', 'open'],
-    queryFn: () => listOrders('open'),
+    queryKey: ['orders', 'open', 'unserved'],
+    queryFn: () => listOrders('open', true),
     refetchInterval: 5000,
   })
 
@@ -167,7 +167,7 @@ export default function KDSPage() {
     },
     onSuccess: (orderId) => {
       setDismissedIds((prev) => new Set([...prev, orderId]))
-      qc.invalidateQueries({ queryKey: ['orders', 'open'] })
+      qc.invalidateQueries({ queryKey: ['orders', 'open', 'unserved'] })
     },
   })
 
