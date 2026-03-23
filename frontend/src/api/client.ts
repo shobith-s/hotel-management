@@ -23,23 +23,41 @@ api.interceptors.response.use(
   },
 )
 
-// Fetch an authenticated HTML receipt and print it.
-// IMPORTANT: window.open() must be called synchronously within the click
-// handler (before any await) — otherwise popup blockers silently block it.
+// Fetch an authenticated HTML receipt and print it via a full-screen iframe.
+// Avoids popup blockers entirely — the iframe lives in the same document/origin
+// so document.write and contentWindow.print() always work.
 export async function openPrintPage(path: string) {
-  // 1. Open window immediately — still inside the user gesture
-  const win = window.open('', '_blank')
-  if (!win) return
-  win.document.write('<html><body style="font-family:sans-serif;padding:24px;color:#555">Loading receipt…</body></html>')
-
-  // 2. Fetch HTML with auth token
   const res = await api.get<string>(path, { responseType: 'text' })
 
-  // 3. Replace placeholder with real receipt and trigger print
-  win.document.open()
-  win.document.write(res.data)
-  win.document.close()
-  setTimeout(() => win.print(), 300)
+  // Full-screen overlay iframe
+  const iframe = document.createElement('iframe')
+  iframe.style.cssText =
+    'position:fixed;inset:0;width:100%;height:100%;border:none;z-index:9999;background:#fff'
+  document.body.appendChild(iframe)
+
+  // Close button (hidden during print via @media print)
+  const closeBtn = document.createElement('button')
+  closeBtn.textContent = '✕ Close'
+  closeBtn.style.cssText =
+    'position:fixed;top:16px;right:16px;z-index:10000;padding:8px 20px;' +
+    'background:#111;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;' +
+    'font-family:sans-serif;box-shadow:0 2px 8px rgba(0,0,0,0.3)'
+  closeBtn.onclick = () => {
+    document.body.removeChild(iframe)
+    document.body.removeChild(closeBtn)
+  }
+  document.body.appendChild(closeBtn)
+
+  // Write receipt HTML into iframe (same origin — always works)
+  const doc = iframe.contentDocument!
+  doc.open()
+  doc.write(res.data)
+  doc.close()
+
+  // Trigger print after render; close overlay after print dialog closes
+  setTimeout(() => {
+    iframe.contentWindow?.print()
+  }, 300)
 }
 
 export async function logout() {
