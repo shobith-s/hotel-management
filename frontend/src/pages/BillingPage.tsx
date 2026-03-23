@@ -178,9 +178,20 @@ export default function BillingPage() {
               {selectedTable.table_number} · Bill {bill?.bill_number}
             </p>
             <p className="font-bold text-2xl text-primary mb-8">₹{grandTotal.toFixed(2)}</p>
-            <button onClick={reset} className="btn-primary px-8 py-3">
-              Back to Tables
-            </button>
+            <div className="flex gap-3 justify-center">
+              {bill && (
+                <button
+                  onClick={() => openPrintPage(`/print/bill/${bill.id}`)}
+                  className="px-8 py-3 flex items-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
+                >
+                  <span className="material-symbols-outlined">print</span>
+                  Print Bill
+                </button>
+              )}
+              <button onClick={reset} className="btn-primary px-8 py-3">
+                Back to Tables
+              </button>
+            </div>
           </div>
         ) : (
           /* ── Bill view ── */

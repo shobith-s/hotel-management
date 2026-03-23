@@ -163,8 +163,10 @@ export default function KDSPage() {
     mutationFn: async (order: OrderRead) => {
       const activeItems = order.items.filter((i) => !i.is_voided && !i.is_served)
       await Promise.all(activeItems.map((item) => markItemServed(order.id, item.id)))
+      return order.id
     },
-    onSuccess: () => {
+    onSuccess: (orderId) => {
+      setDismissedIds((prev) => new Set([...prev, orderId]))
       qc.invalidateQueries({ queryKey: ['orders', 'open'] })
     },
   })
