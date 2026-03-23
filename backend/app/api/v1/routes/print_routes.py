@@ -63,6 +63,7 @@ _PRINT_BUTTON = """
       Print / Save as PDF
     </button>
   </div>
+  <script>window.onload = function(){ window.print(); }</script>
 """
 
 
