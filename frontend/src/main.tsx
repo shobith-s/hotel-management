@@ -14,6 +14,7 @@ import KDSPage from './pages/KDSPage'
 import BillingPage from './pages/BillingPage'
 import LodgePage from './pages/LodgePage'
 import UsersPage from './pages/UsersPage'
+import ReportsPage from './pages/ReportsPage'
 
 const queryClient = new QueryClient()
 
@@ -38,6 +39,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/lodge" element={<LodgePage />} />
               <Route path="/users" element={<UsersPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
             </Route>
           </Route>
 

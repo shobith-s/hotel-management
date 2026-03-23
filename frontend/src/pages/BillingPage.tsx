@@ -357,6 +357,15 @@ export default function BillingPage() {
                       {settleMutation.isPending ? 'Processing…' : 'Settle Payment'}
                     </button>
                   )}
+                  {bill && bill.payment_status === 'paid' && (
+                    <button
+                      onClick={() => window.open(`/api/v1/print/bill/${bill.id}`, '_blank')}
+                      className="w-full py-3 flex items-center justify-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">print</span>
+                      Print Bill
+                    </button>
+                  )}
                   {generateBillMutation.isError && (
                     <p className="text-xs text-error text-center">
                       {(generateBillMutation.error as any)?.response?.data?.detail ?? 'Failed to generate bill'}

@@ -548,9 +548,18 @@ function CheckoutReceipt({ summary, onDone }: { summary: CheckoutSummary; onDone
         </div>
       </div>
 
-      <button onClick={onDone} className="w-full btn-primary py-3">
-        Done
-      </button>
+      <div className="flex gap-3">
+        <button
+          onClick={() => window.open(`/api/v1/print/lodge/${summary.booking.id}`, '_blank')}
+          className="flex-1 py-3 flex items-center justify-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
+        >
+          <span className="material-symbols-outlined text-xl">print</span>
+          Print Receipt
+        </button>
+        <button onClick={onDone} className="flex-1 btn-primary py-3">
+          Done
+        </button>
+      </div>
     </div>
   )
 }

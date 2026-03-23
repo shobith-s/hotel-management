@@ -10,6 +10,7 @@ const ALL_NAV_ITEMS = [
   { to: '/billing',   icon: 'payments',           label: 'Billing' },
   { to: '/lodge',     icon: 'bed',                label: 'Lodge' },
   { to: '/users',     icon: 'group',              label: 'Users' },
+  { to: '/reports',   icon: 'analytics',          label: 'Reports' },
 ]
 
 const ROLE_LABELS: Record<string, string> = {
