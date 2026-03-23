@@ -43,7 +43,7 @@ def _resolve_unit_price(
     raise HTTPException(400, f"'{item.name}' has no price configured. Add variants or mark as market price.")
 
 
-def _build_order_item(db: Session, order_id: uuid.UUID, data: OrderItemCreate) -> OrderItem:
+def _build_order_item(db: Session, order_id: uuid.UUID, data: OrderItemCreate, is_served: bool = False) -> OrderItem:
     item = db.get(MenuItem, data.menu_item_id)
     if not item:
         raise HTTPException(404, f"Menu item {data.menu_item_id} not found")
@@ -65,6 +65,7 @@ def _build_order_item(db: Session, order_id: uuid.UUID, data: OrderItemCreate) -
         quantity=data.quantity,
         unit_price=unit_price,
         notes=data.notes,
+        is_served=is_served,
     )
 
 
@@ -81,8 +82,9 @@ def create_order(db: Session, data: OrderCreate, waiter_id: uuid.UUID) -> Order:
     db.add(order)
     db.flush()
 
+    voice = data.order_source == OrderSource.voice
     for item_data in data.items:
-        order_item = _build_order_item(db, order.id, item_data)
+        order_item = _build_order_item(db, order.id, item_data, is_served=voice)
         db.add(order_item)
         db.flush()
         db.add(OrderAuditLog(
@@ -118,8 +120,9 @@ def add_items(db: Session, order_id: uuid.UUID, data: AddItemsRequest, waiter_id
     if order.status != OrderStatus.open:
         raise HTTPException(400, "Cannot add items to a closed or billed order")
 
+    voice = data.order_source == OrderSource.voice
     for item_data in data.items:
-        order_item = _build_order_item(db, order.id, item_data)
+        order_item = _build_order_item(db, order.id, item_data, is_served=voice)
         db.add(order_item)
         db.flush()
         db.add(OrderAuditLog(

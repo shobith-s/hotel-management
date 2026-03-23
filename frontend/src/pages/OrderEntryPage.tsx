@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import { fetchFullMenu, type MenuCategory, type MenuItem, type MenuItemVariant } from '../api/menu'
 import { fetchTables, type Table } from '../api/tables'
-import { createOrder, type OrderCreate } from '../api/orders'
+import { createOrder, addItemsToOrder, getActiveOrderForTable, type OrderCreate } from '../api/orders'
+import { useVoiceOrder, type VoiceParsedItem } from '../hooks/useVoiceOrder'
 
 interface CartItem {
   id: string          // menuItemId + variantId
@@ -80,6 +81,100 @@ function VariantPicker({
     </div>
   )
 }
+
+// ── Voice Confirmation Modal ───────────────────────────────────────────────────
+
+function VoiceConfirmModal({
+  transcript,
+  items,
+  onConfirm,
+  onCancel,
+}: {
+  transcript: string
+  items: VoiceParsedItem[]
+  onConfirm: (items: VoiceParsedItem[]) => void
+  onCancel: () => void
+}) {
+  const [localItems, setLocalItems] = useState<VoiceParsedItem[]>(items)
+
+  function updateQty(idx: number, delta: number) {
+    setLocalItems((prev) =>
+      prev
+        .map((it, i) => (i === idx ? { ...it, quantity: it.quantity + delta } : it))
+        .filter((it) => it.quantity > 0),
+    )
+  }
+
+  const total = localItems.reduce((s, it) => s + it.variant.price * it.quantity, 0)
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-surface-container-lowest rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="p-6 border-b border-outline-variant/15">
+          <h3 className="font-headline text-xl font-bold text-primary">Confirm Voice Order</h3>
+          <p className="text-xs text-on-surface-variant mt-1 italic">"{transcript}"</p>
+        </div>
+
+        <div className="p-6 space-y-4 max-h-72 overflow-y-auto">
+          {localItems.length === 0 && (
+            <p className="text-sm text-on-surface-variant text-center">No items recognised. Try again.</p>
+          )}
+          {localItems.map((it, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-primary text-sm">{it.menuItem.name}</p>
+                {it.menuItem.variants.length > 1 && (
+                  <p className="text-xs text-on-surface-variant">{it.variant.label}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => updateQty(idx, -1)}
+                  className="w-6 h-6 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-surface-container-low"
+                >
+                  <span className="material-symbols-outlined text-xs">remove</span>
+                </button>
+                <span className="text-xs font-bold text-primary w-4 text-center">{it.quantity}</span>
+                <button
+                  onClick={() => updateQty(idx, 1)}
+                  className="w-6 h-6 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-surface-container-low"
+                >
+                  <span className="material-symbols-outlined text-xs">add</span>
+                </button>
+              </div>
+              <span className="text-sm font-bold text-primary w-16 text-right">
+                ₹{it.variant.price * it.quantity}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-6 border-t border-outline-variant/15">
+          <div className="flex justify-between text-sm font-bold text-primary mb-4">
+            <span>Total</span>
+            <span>₹{total}</span>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onCancel}
+              className="flex-1 py-3 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors text-sm font-medium"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onConfirm(localItems)}
+              disabled={localItems.length === 0}
+              className="flex-1 py-3 rounded-full bg-primary text-white font-bold text-sm hover:bg-primary/90 transition-colors disabled:opacity-40"
+            >
+              Confirm Order
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 // ── Step 1: Table Selection Grid ───────────────────────────────────────────────
 
@@ -206,6 +301,7 @@ export default function OrderEntryPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [search, setSearch] = useState('')
   const [orderSuccess, setOrderSuccess] = useState(false)
+  const [voicePending, setVoicePending] = useState<{ items: VoiceParsedItem[]; transcript: string } | null>(null)
 
   const sendMutation = useMutation({
     mutationFn: (data: OrderCreate) => createOrder(data),
@@ -218,6 +314,58 @@ export default function OrderEntryPage() {
       setTimeout(() => setOrderSuccess(false), 3000)
     },
   })
+
+  const addItemsMutation = useMutation({
+    mutationFn: ({ orderId, items }: { orderId: string; items: VoiceParsedItem[] }) =>
+      addItemsToOrder(
+        orderId,
+        items.map((it) => ({ menu_item_id: it.menuItem.id, variant_id: it.variant.id, quantity: it.quantity })),
+        'voice',
+      ),
+    onSuccess: () => {
+      setOrderSuccess(true)
+      setSelectedTable(null)
+      qc.invalidateQueries({ queryKey: ['tables'] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      setTimeout(() => setOrderSuccess(false), 3000)
+    },
+  })
+
+  const handleVoiceResult = useCallback(
+    (items: VoiceParsedItem[], transcript: string) => {
+      setVoicePending({ items, transcript })
+    },
+    [],
+  )
+
+  const { listening, startListening, stopListening, supported: voiceSupported, error: voiceError } =
+    useVoiceOrder(menu, handleVoiceResult)
+
+  async function handleVoiceConfirm(confirmedItems: VoiceParsedItem[]) {
+    setVoicePending(null)
+    if (!selectedTable || confirmedItems.length === 0) return
+
+    // If table is occupied, append to existing order; otherwise create new
+    if (selectedTable.status === 'occupied') {
+      try {
+        const activeOrder = await getActiveOrderForTable(selectedTable.id)
+        addItemsMutation.mutate({ orderId: activeOrder.id, items: confirmedItems })
+        return
+      } catch {
+        // No active order found — fall through to create new
+      }
+    }
+
+    sendMutation.mutate({
+      table_id: selectedTable.id,
+      order_source: 'voice',
+      items: confirmedItems.map((it) => ({
+        menu_item_id: it.menuItem.id,
+        variant_id: it.variant.id,
+        quantity: it.quantity,
+      })),
+    })
+  }
 
   // ── Step 1: show table grid ────────────────────────────────────────────────
   if (!selectedTable) {
@@ -276,6 +424,7 @@ export default function OrderEntryPage() {
     if (!selectedTable || cart.length === 0) return
     sendMutation.mutate({
       table_id: selectedTable.id,
+      order_source: 'manual',
       items: cart.map((c) => ({
         menu_item_id: c.menuItemId,
         variant_id: c.variantId,
@@ -421,6 +570,16 @@ export default function OrderEntryPage() {
         </div>
       </main>
 
+      {/* Voice Confirm Modal */}
+      {voicePending && (
+        <VoiceConfirmModal
+          transcript={voicePending.transcript}
+          items={voicePending.items}
+          onConfirm={handleVoiceConfirm}
+          onCancel={() => setVoicePending(null)}
+        />
+      )}
+
       {/* Right: Cart */}
       <aside className="w-[380px] bg-surface-container-lowest flex flex-col border-l border-outline-variant/15 shrink-0">
         <div className="p-8 border-b border-outline-variant/10">
@@ -487,9 +646,36 @@ export default function OrderEntryPage() {
               <span className="font-headline font-bold text-primary text-2xl italic">₹{total.toFixed(2)}</span>
             </div>
           </div>
+          {/* Voice Order Button */}
+          {voiceSupported && (
+            <button
+              onMouseDown={startListening}
+              onMouseUp={stopListening}
+              onTouchStart={startListening}
+              onTouchEnd={stopListening}
+              disabled={sendMutation.isPending || addItemsMutation.isPending}
+              className={`w-full py-4 mb-3 flex items-center justify-center gap-3 rounded-full font-bold text-sm transition-all ${
+                listening
+                  ? 'bg-error text-white shadow-lg scale-105 animate-pulse'
+                  : 'bg-surface-container-high text-primary hover:bg-surface-container border border-outline-variant/30'
+              } disabled:opacity-40`}
+            >
+              <span className="material-symbols-outlined">{listening ? 'mic' : 'mic_none'}</span>
+              {listening ? 'Listening… release when done' : 'Hold to speak order'}
+            </button>
+          )}
+          {voiceError && (
+            <p className="text-xs text-error mb-3 text-center">{voiceError}</p>
+          )}
+
           {sendMutation.isError && (
             <p className="text-xs text-error mb-3 text-center">
               {(sendMutation.error as any)?.response?.data?.detail ?? 'Failed to send order'}
+            </p>
+          )}
+          {addItemsMutation.isError && (
+            <p className="text-xs text-error mb-3 text-center">
+              {(addItemsMutation.error as any)?.response?.data?.detail ?? 'Failed to add items'}
             </p>
           )}
           <button

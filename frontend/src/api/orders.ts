@@ -39,6 +39,7 @@ export interface OrderItemCreate {
 export interface OrderCreate {
   table_id: string
   items: OrderItemCreate[]
+  order_source?: 'manual' | 'voice'
 }
 
 export async function listOrders(status?: string, hasUnserved?: boolean): Promise<OrderRead[]> {
@@ -61,5 +62,10 @@ export async function getActiveOrderForTable(tableId: string): Promise<OrderRead
 
 export async function markItemServed(orderId: string, itemId: string): Promise<OrderItemRead> {
   const res = await api.patch<OrderItemRead>(`/orders/${orderId}/items/${itemId}/served`)
+  return res.data
+}
+
+export async function addItemsToOrder(orderId: string, items: OrderItemCreate[], orderSource: 'manual' | 'voice' = 'manual'): Promise<OrderRead> {
+  const res = await api.post<OrderRead>(`/orders/${orderId}/items`, { items, order_source: orderSource })
   return res.data
 }

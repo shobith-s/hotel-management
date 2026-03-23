@@ -64,6 +64,7 @@ class OrderCreate(BaseModel):
 
 class AddItemsRequest(BaseModel):
     items: List[OrderItemCreate]
+    order_source: OrderSource = OrderSource.manual
 
 
 class OrderRead(BaseModel):
