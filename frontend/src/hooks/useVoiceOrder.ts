@@ -2,6 +2,24 @@ import { useCallback, useRef, useState } from 'react'
 import FlexSearch from 'flexsearch'
 import type { MenuCategory, MenuItem, MenuItemVariant } from '../api/menu'
 
+// Common Indian pronunciation variants → canonical spelling
+const NORMALISE: Record<string, string> = {
+  biriyani: 'biryani', biriani: 'biryani', bryani: 'biryani',
+  panneer: 'paneer', panner: 'paneer',
+  naan: 'nan', nan: 'naan',
+  tikki: 'tikka',
+  masalla: 'masala', massala: 'masala',
+  rotii: 'roti', chapati: 'chapathi',
+  daal: 'dal', dhal: 'dal',
+}
+
+function normalise(text: string): string {
+  return text
+    .split(/\s+/)
+    .map((w) => NORMALISE[w] ?? w)
+    .join(' ')
+}
+
 export interface VoiceParsedItem {
   menuItem: MenuItem
   variant: MenuItemVariant
@@ -70,11 +88,7 @@ export function useVoiceOrder(
 
   // Build FlexSearch index — word-level tokenization + phonetic encoding
   const buildIndex = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const index = new (FlexSearch.Index as any)({
-      tokenize: 'forward',   // matches partial words: "pan" → "paneer"
-      encoder: 'soundex',    // phonetic: "panneer" → "paneer"
-    })
+    const index = new FlexSearch.Index({ tokenize: 'forward' })
     allItems.forEach((item, i) => index.add(i, item.name))
     return index
   }, [menu]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -89,7 +103,7 @@ export function useVoiceOrder(
         const tokens = phrase.split(/\s+/).filter(Boolean)
         const [qty, rest] = extractQtyAndRest(tokens)
         const cleaned = stripFillers(rest)
-        const query = cleaned.join(' ')
+        const query = normalise(cleaned.join(' '))
         if (!query) continue
 
         const results = index.search(query, { limit: 1 }) as number[]
