@@ -1,5 +1,5 @@
+import traceback
 import uuid
-from datetime import timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
@@ -10,6 +10,7 @@ from app.core.security import get_current_user_from_query
 from app.models.billing import Bill
 from app.models.enums import BookingStatus, UserRole
 from app.models.lodge import Booking
+from app.models.order import Order, OrderItem
 
 router = APIRouter(prefix="/print", tags=["Print"])
 
@@ -92,20 +93,23 @@ def _hotel_header() -> str:
 
 @router.get("/bill/{bill_id}", response_class=HTMLResponse)
 def print_bill(bill_id: uuid.UUID, token: str = Query(...), db: Session = Depends(get_db)):
+    try:
+        return _render_bill(bill_id, token, db)
+    except HTTPException:
+        raise
+    except Exception:
+        return HTMLResponse(f"<pre style='padding:24px;font-size:13px'>{traceback.format_exc()}</pre>", status_code=500)
+
+
+def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
     get_current_user_from_query(token, db)
-    bill: Bill | None = (
+    bill = (
         db.query(Bill)
         .options(
-            joinedload(Bill.order)
-            .joinedload("table"),
-            joinedload(Bill.order)
-            .joinedload("waiter"),
-            joinedload(Bill.order)
-            .joinedload("items")
-            .joinedload("menu_item"),
-            joinedload(Bill.order)
-            .joinedload("items")
-            .joinedload("variant"),
+            joinedload(Bill.order).joinedload(Order.table),
+            joinedload(Bill.order).joinedload(Order.waiter),
+            joinedload(Bill.order).joinedload(Order.items).joinedload(OrderItem.menu_item),
+            joinedload(Bill.order).joinedload(Order.items).joinedload(OrderItem.variant),
             joinedload(Bill.served_by_user),
         )
         .filter(Bill.id == bill_id)
@@ -229,6 +233,15 @@ def print_bill(bill_id: uuid.UUID, token: str = Query(...), db: Session = Depend
 
 @router.get("/lodge/{booking_id}", response_class=HTMLResponse)
 def print_lodge_receipt(booking_id: uuid.UUID, token: str = Query(...), db: Session = Depends(get_db)):
+    try:
+        return _render_lodge(booking_id, token, db)
+    except HTTPException:
+        raise
+    except Exception:
+        return HTMLResponse(f"<pre style='padding:24px;font-size:13px'>{traceback.format_exc()}</pre>", status_code=500)
+
+
+def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
     user = get_current_user_from_query(token, db)
     if user.role not in (UserRole.admin, UserRole.manager, UserRole.receptionist):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
