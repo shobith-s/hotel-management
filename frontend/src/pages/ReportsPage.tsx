@@ -296,7 +296,7 @@ export default function ReportsPage() {
   return (
     <div className="flex-1 overflow-y-auto bg-surface">
       <TopBar />
-      <div className="p-10 max-w-5xl mx-auto">
+      <div className="px-6 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="font-headline text-4xl font-bold text-primary tracking-tight">Reports</h1>
