@@ -27,6 +27,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    force_password_change: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     orders: Mapped[List[Order]] = relationship("Order", back_populates="waiter", foreign_keys="Order.waiter_id")

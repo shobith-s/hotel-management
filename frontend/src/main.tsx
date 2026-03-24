@@ -16,6 +16,7 @@ import LodgePage from './pages/LodgePage'
 import UsersPage from './pages/UsersPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import ChangePasswordPage from './pages/ChangePasswordPage'
 
 const queryClient = new QueryClient()
 
@@ -32,6 +33,8 @@ createRoot(document.getElementById('root')!).render(
 
           {/* Protected app routes — RequireAuth validates token before rendering */}
           <Route element={<RequireAuth />}>
+            {/* Change password — no sidebar, rendered before AppLayout guard */}
+            <Route path="/change-password" element={<ChangePasswordPage />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/menu" element={<MenuPage />} />

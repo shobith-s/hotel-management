@@ -19,6 +19,7 @@ def create_user(db: Session, data: UserCreate) -> User:
         email=data.email,
         hashed_password=hash_password(data.password),
         role=data.role,
+        force_password_change=True,
     )
     db.add(user)
     db.commit()
@@ -45,6 +46,41 @@ def update_user(db: Session, user_id: uuid.UUID, data: UserUpdate) -> User:
     user = get_user_by_id(db, user_id)
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(user, field, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def delete_user(db: Session, user_id: uuid.UUID) -> None:
+    user = get_user_by_id(db, user_id)
+    has_records = (
+        bool(user.orders)
+        or bool(user.bills)
+        or bool(user.bookings)
+    )
+    if has_records:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete user with existing records. Deactivate instead.",
+        )
+    db.delete(user)
+    db.commit()
+
+
+def reset_password(db: Session, user_id: uuid.UUID, new_password: str) -> User:
+    user = get_user_by_id(db, user_id)
+    user.hashed_password = hash_password(new_password)
+    user.force_password_change = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def change_own_password(db: Session, user: User, current_password: str, new_password: str) -> User:
+    if not verify_password(current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    user.hashed_password = hash_password(new_password)
+    user.force_password_change = False
     db.commit()
     db.refresh(user)
     return user

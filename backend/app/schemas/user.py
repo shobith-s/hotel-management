@@ -31,7 +31,17 @@ class UserRead(BaseModel):
     email: str
     role: UserRole
     is_active: bool
+    force_password_change: bool
     created_at: datetime
+
+
+class UserResetPassword(BaseModel):
+    new_password: str
+
+
+class UserChangePassword(BaseModel):
+    current_password: str
+    new_password: str
 
 
 class LoginRequest(BaseModel):

@@ -38,12 +38,19 @@ function AuthCheck() {
     return <Navigate to="/login" replace />
   }
 
-  // Role-based route guard — redirect to role's home if accessing a forbidden page
   if (user) {
-    const allowed = ROLE_ALLOWED_PATHS[user.role] ?? []
-    const currentPath = '/' + location.pathname.split('/')[1]
-    if (!allowed.includes(currentPath)) {
-      return <Navigate to={allowed[0]} replace />
+    // Force password change — intercept before any other routing
+    if (user.force_password_change && location.pathname !== '/change-password') {
+      return <Navigate to="/change-password" replace />
+    }
+
+    // Role-based route guard — redirect to role's home if accessing a forbidden page
+    if (!user.force_password_change) {
+      const allowed = ROLE_ALLOWED_PATHS[user.role] ?? []
+      const currentPath = '/' + location.pathname.split('/')[1]
+      if (!allowed.includes(currentPath)) {
+        return <Navigate to={allowed[0]} replace />
+      }
     }
   }
 

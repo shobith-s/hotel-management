@@ -5,40 +5,46 @@ import { fetchRooms } from '../api/lodge'
 
 // ── Status config ──────────────────────────────────────────────────────────────
 
-const STATUS: Record<string, { card: string; dot: string; label: string; name: string; sub: string }> = {
-  available:      { card: 'bg-surface-container-lowest border-outline-variant/20 hover:border-outline-variant/50 hover:shadow-md', dot: 'bg-emerald-500', label: 'Available',      name: 'text-primary',     sub: 'text-on-surface-variant' },
-  occupied:       { card: 'bg-primary border-primary/20',                                                                          dot: 'bg-amber-400',   label: 'Occupied',       name: 'text-on-primary',  sub: 'text-on-primary/70'     },
-  bill_requested: { card: 'bg-amber-50 border-amber-300',                                                                          dot: 'bg-amber-500',   label: 'Bill Requested', name: 'text-amber-900',   sub: 'text-amber-700'         },
-  reserved:       { card: 'bg-surface-container border-outline-variant/30',                                                        dot: 'bg-secondary',   label: 'Reserved',       name: 'text-primary',     sub: 'text-on-surface-variant' },
-}
-
-// ── Span mapping ───────────────────────────────────────────────────────────────
-// Desktop lg (6-col): 2-seat=1×1  4-seat=2×1  6-seat=2×2  8-seat=3×2
-// Tablet  md (4-col): 2-seat=1×1  4-seat=2×1  6-seat=2×2  8-seat=2×2
-// Mobile     (2-col): 2-seat=1×1  4-seat=2×1  6-seat=2×1  8-seat=2×1
-
-function span(cap: number): string {
-  if (cap >= 8) return 'col-span-2 row-span-1 md:row-span-2 lg:col-span-3 lg:row-span-2'
-  if (cap >= 6) return 'col-span-2 row-span-1 md:row-span-2 lg:row-span-2'
-  if (cap >= 4) return 'col-span-2 row-span-1'
-  return 'col-span-1 row-span-1'
+const STATUS: Record<string, { card: string; dot: string; label: string; nameColor: string; subColor: string }> = {
+  available:      { card: 'bg-surface-container-lowest border-outline-variant/20 hover:border-outline-variant/50 hover:shadow-md', dot: 'bg-emerald-500', label: 'Available',      nameColor: 'text-primary',    subColor: 'text-on-surface-variant' },
+  occupied:       { card: 'bg-primary border-primary/20',                                                                          dot: 'bg-amber-400',   label: 'Occupied',       nameColor: 'text-on-primary', subColor: 'text-on-primary/70'       },
+  bill_requested: { card: 'bg-amber-50 border-amber-300',                                                                          dot: 'bg-amber-500',   label: 'Bill Requested', nameColor: 'text-amber-900',  subColor: 'text-amber-700'           },
+  reserved:       { card: 'bg-surface-container border-outline-variant/30',                                                        dot: 'bg-secondary',   label: 'Reserved',       nameColor: 'text-primary',    subColor: 'text-on-surface-variant'  },
 }
 
 // ── Table card ─────────────────────────────────────────────────────────────────
 
 function TableCard({ table }: { table: Table }) {
   const s = STATUS[table.status] ?? STATUS.available
+  const occupied = table.status === 'occupied'
+
   return (
-    <div className={`${span(table.capacity)} rounded-xl border-2 transition-all p-3 lg:p-4 flex flex-col justify-between ${s.card}`}>
-      <div className="flex justify-between items-start">
-        <span className={`font-bold font-headline text-sm lg:text-base leading-none ${s.name}`}>
+    <div
+      className={`rounded-xl border-2 transition-all cursor-default flex flex-col justify-between ${s.card}`}
+      style={{ padding: '12px 14px' }}
+    >
+      {/* Top row: table number + capacity badge */}
+      <div className="flex items-center justify-between">
+        <span className={`font-bold font-headline text-xl leading-none ${s.nameColor}`}>
           {table.table_number}
         </span>
-        <span className={`w-2.5 h-2.5 rounded-full mt-0.5 shrink-0 ${s.dot}`} />
+        <span
+          className={`text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+            occupied
+              ? 'bg-on-primary/20 text-on-primary'
+              : 'bg-outline-variant/20 text-on-surface-variant'
+          }`}
+        >
+          {table.capacity}
+        </span>
       </div>
-      <div>
-        <p className={`text-xs font-medium leading-snug ${s.sub}`}>{table.capacity} seats</p>
-        <p className={`text-xs font-bold uppercase tracking-wide leading-snug ${s.sub}`}>{s.label}</p>
+
+      {/* Bottom row: status */}
+      <div className="flex items-center gap-1.5">
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.dot}`} />
+        <span className={`text-xs font-bold uppercase tracking-wide leading-none ${s.subColor}`}>
+          {s.label}
+        </span>
       </div>
     </div>
   )
@@ -66,18 +72,16 @@ export default function DashboardPage() {
   const roomsOccupied   = rooms.filter((r: any) => r.status === 'occupied').length
   const roomsAvailable  = rooms.length - roomsOccupied
 
-  // Sort capacity-descending then table number — guarantees perfect dense packing:
-  // big items first create exactly-shaped gaps that smaller items backfill with zero waste.
-  const sorted = [...tables].sort((a, b) => {
-    if (b.capacity !== a.capacity) return b.capacity - a.capacity
-    return a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
-  })
+  // Sort all tables by capacity descending, then by table number
+  const sortedTables = [...tables].sort((a, b) =>
+    b.capacity - a.capacity || a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
+  )
 
   return (
-    <div className="flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden">
       <TopBar title="Sukhsagar" />
 
-      <div className="flex-1 flex flex-col pt-5 px-6 md:px-10 pb-5 gap-4 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col gap-4 pt-5 px-6 md:px-10 pb-5">
 
         {/* ── Stat cards ───────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
@@ -98,38 +102,34 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Restaurant tables ─────────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col gap-3 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col gap-3">
 
           {/* Header + legend */}
-          <div className="flex items-center justify-between shrink-0 flex-wrap gap-2">
+          <div className="flex items-center justify-between flex-wrap gap-2 shrink-0">
             <h3 className="text-xl md:text-2xl font-headline text-primary">Restaurant Tables</h3>
             <div className="flex items-center gap-3 md:gap-5 text-xs font-bold uppercase text-on-surface-variant flex-wrap">
               <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />Available</span>
               <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" />Occupied</span>
               <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" />Bill Req.</span>
               <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-secondary" />Reserved</span>
-              <span className="hidden lg:flex items-center gap-1 ml-2 font-normal normal-case text-on-surface-variant/50">
+              <span className="hidden md:flex items-center gap-1 ml-1 font-normal normal-case text-on-surface-variant/50">
                 <span className="material-symbols-outlined" style={{ fontSize: 12 }}>sync</span>
                 Auto-refreshes every 15 s
               </span>
             </div>
           </div>
 
-          {/* Bento grid */}
+          {/* Cards grid — fills all remaining vertical space */}
           {tablesLoading ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant animate-pulse">
-              Loading tables…
-            </div>
+            <p className="text-sm text-on-surface-variant animate-pulse py-10 text-center">Loading tables…</p>
           ) : tables.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center text-sm text-on-surface-variant">
-              No tables configured yet.
-            </div>
+            <p className="text-sm text-on-surface-variant py-10 text-center">No tables configured yet.</p>
           ) : (
             <div
-              className="flex-1 min-h-0 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 [grid-auto-flow:dense]"
-              style={{ gridAutoRows: 'minmax(56px, 1fr)' }}
+              className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+              style={{ gridAutoRows: '1fr', gap: 10 }}
             >
-              {sorted.map(t => <TableCard key={t.id} table={t} />)}
+              {sortedTables.map(t => <TableCard key={t.id} table={t} />)}
             </div>
           )}
         </div>

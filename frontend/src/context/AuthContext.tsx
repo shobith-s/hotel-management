@@ -7,6 +7,7 @@ export interface AuthUser {
   name: string
   email: string
   role: UserRole
+  force_password_change: boolean
 }
 
 interface AuthContextValue {
