@@ -344,13 +344,11 @@ export default function ReportsPage() {
         {/* Revenue tab */}
         {tab === 'revenue' && revenueData && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
               <StatCard icon="account_balance_wallet" label="Total Revenue" value={`₹${revenueData.total_revenue.toLocaleString('en-IN')}`} color="text-primary" />
               <StatCard icon="restaurant" label="Restaurant" value={`₹${revenueData.restaurant_revenue.toLocaleString('en-IN')}`} sub={`${revenueData.total_bills} bill${revenueData.total_bills !== 1 ? 's' : ''} · avg ₹${revenueData.avg_spend_per_bill.toLocaleString('en-IN')}`} />
               <StatCard icon="bed" label="Lodge" value={`₹${revenueData.lodge_revenue.toLocaleString('en-IN')}`} sub={`${revenueData.total_checkouts} checkout${revenueData.total_checkouts !== 1 ? 's' : ''}`} />
               <StatCard icon="receipt_long" label="GST Collected" value={`₹${revenueData.restaurant_gst.toLocaleString('en-IN')}`} sub="Restaurant GST" color="text-amber-600" />
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-8">
               <StatCard icon="local_offer" label="Total Discounts" value={`₹${revenueData.total_discount.toLocaleString('en-IN')}`} sub="Applied across all bills" color="text-secondary" />
               <StatCard icon="cancel" label="Voided Items" value={String(revenueData.void_summary.count)} sub={`₹${revenueData.void_summary.value.toLocaleString('en-IN')} lost revenue`} color="text-error" />
             </div>
