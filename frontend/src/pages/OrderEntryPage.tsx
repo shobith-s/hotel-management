@@ -187,9 +187,17 @@ function TableGrid({
   isLoading: boolean
   onSelect: (table: Table) => void
 }) {
-  const available = tables.filter((t) => t.status === 'available')
-  const occupied = tables.filter((t) => t.status === 'occupied')
-  const other = tables.filter((t) => t.status !== 'available' && t.status !== 'occupied')
+  const sorted = [...tables].sort((a, b) => a.table_number.localeCompare(b.table_number, undefined, { numeric: true }))
+
+  const statusStyle: Record<string, { card: string; icon: string; label: string; labelColor: string }> = {
+    available:      { card: 'bg-surface-container-lowest shadow-card hover:shadow-card-hover hover:border-primary border border-transparent cursor-pointer', icon: 'text-emerald-500', label: 'Available',    labelColor: 'text-emerald-600' },
+    occupied:       { card: 'bg-surface-container-lowest shadow-card hover:shadow-card-hover hover:border-amber-400 border border-amber-200 cursor-pointer',  icon: 'text-amber-500',  label: 'Occupied',     labelColor: 'text-amber-600' },
+    bill_requested: { card: 'bg-surface-container-lowest shadow-card hover:shadow-card-hover hover:border-primary border border-primary/30 cursor-pointer',   icon: 'text-primary',    label: 'Bill Requested', labelColor: 'text-primary' },
+    reserved:       { card: 'bg-surface-container-low border border-outline-variant/20 opacity-50 cursor-not-allowed',                                         icon: 'text-on-surface-variant', label: 'Reserved', labelColor: 'text-on-surface-variant' },
+    maintenance:    { card: 'bg-surface-container-low border border-outline-variant/20 opacity-50 cursor-not-allowed',                                         icon: 'text-on-surface-variant', label: 'Maintenance', labelColor: 'text-on-surface-variant' },
+  }
+
+  const isSelectable = (status: string) => status === 'available' || status === 'occupied' || status === 'bill_requested'
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -204,70 +212,26 @@ function TableGrid({
           <div className="text-center py-20 text-on-surface-variant animate-pulse text-sm">Loading tables…</div>
         )}
 
-        {available.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">
-              Available — {available.length} table{available.length !== 1 ? 's' : ''}
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {available.map((t) => (
-                <button
+        {!isLoading && sorted.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {sorted.map((t) => {
+              const s = statusStyle[t.status] ?? statusStyle.reserved
+              const Tag = isSelectable(t.status) ? 'button' : 'div'
+              return (
+                <Tag
                   key={t.id}
-                  onClick={() => onSelect(t)}
-                  className="flex flex-col items-center justify-center gap-2 bg-surface-container-lowest rounded-2xl p-6 shadow-card hover:shadow-card-hover hover:border-primary border border-transparent transition-all duration-200 group"
+                  onClick={isSelectable(t.status) ? () => onSelect(t) : undefined}
+                  className={`flex flex-col items-center justify-center gap-2 rounded-2xl p-6 transition-all duration-200 group ${s.card}`}
                 >
-                  <span className="material-symbols-outlined text-3xl text-emerald-500 group-hover:scale-110 transition-transform">
+                  <span className={`material-symbols-outlined text-3xl group-hover:scale-110 transition-transform ${s.icon}`}>
                     table_restaurant
                   </span>
                   <span className="font-bold text-primary text-base">{t.table_number}</span>
-                  <span className="text-xs text-emerald-600 font-medium">Available</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {occupied.length > 0 && (
-          <section className="mb-10">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">
-              Occupied — {occupied.length} table{occupied.length !== 1 ? 's' : ''}
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {occupied.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => onSelect(t)}
-                  className="flex flex-col items-center justify-center gap-2 bg-surface-container-lowest rounded-2xl p-6 shadow-card hover:shadow-card-hover hover:border-amber-400 border border-amber-200 transition-all duration-200 group"
-                >
-                  <span className="material-symbols-outlined text-3xl text-amber-500 group-hover:scale-110 transition-transform">
-                    table_restaurant
-                  </span>
-                  <span className="font-bold text-primary text-base">{t.table_number}</span>
-                  <span className="text-xs text-amber-600 font-medium">Occupied — add items</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {other.length > 0 && (
-          <section>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">Other</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {other.map((t) => (
-                <div
-                  key={t.id}
-                  className="flex flex-col items-center justify-center gap-2 bg-surface-container-low rounded-2xl p-6 border border-outline-variant/20 opacity-50 cursor-not-allowed"
-                >
-                  <span className="material-symbols-outlined text-3xl text-on-surface-variant">
-                    table_restaurant
-                  </span>
-                  <span className="font-bold text-on-surface-variant text-base">{t.table_number}</span>
-                  <span className="text-xs text-on-surface-variant font-medium capitalize">{t.status}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+                  <span className={`text-xs font-medium ${s.labelColor}`}>{s.label}</span>
+                </Tag>
+              )
+            })}
+          </div>
         )}
 
         {!isLoading && tables.length === 0 && (
