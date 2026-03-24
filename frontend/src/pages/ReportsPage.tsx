@@ -294,45 +294,40 @@ export default function ReportsPage() {
     : 0
 
   return (
-    <div className="flex-1 overflow-y-auto bg-surface">
-      <TopBar />
-      <div className="px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="font-headline text-4xl font-bold text-primary tracking-tight">Reports</h1>
-          <p className="text-on-surface-variant mt-1 text-sm">Revenue reconciliation and lodge occupancy</p>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex rounded-full overflow-hidden border border-outline-variant/20 text-sm mb-8 w-fit">
-          {([['revenue', 'Revenue'], ['occupancy', 'Occupancy']] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`px-6 py-2.5 font-bold transition-all ${tab === key ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Date range picker */}
-        <div className="flex items-center gap-4 mb-8 bg-surface-container-lowest rounded-2xl p-5 shadow-card flex-wrap">
-          <span className="material-symbols-outlined text-on-surface-variant">date_range</span>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-on-surface-variant font-medium">From</span>
-            <DateInput value={startDate} onChange={setStartDate} />
+    <div className="min-h-screen">
+      <TopBar title="Reports" />
+      <div className="pt-6 px-10 pb-16">
+        {/* Tabs + Date range */}
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+          <div className="flex rounded-full overflow-hidden border border-outline-variant/20 text-sm w-fit">
+            {([['revenue', 'Revenue'], ['occupancy', 'Occupancy']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`px-6 py-2.5 font-bold transition-all ${tab === key ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-on-surface-variant font-medium">To</span>
-            <DateInput value={endDate} onChange={setEndDate} />
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="material-symbols-outlined text-on-surface-variant text-base">date_range</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-on-surface-variant font-medium">From</span>
+              <DateInput value={startDate} onChange={setStartDate} />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-on-surface-variant font-medium">To</span>
+              <DateInput value={endDate} onChange={setEndDate} />
+            </div>
+            {!isValidRange && startDate.length === 10 && endDate.length === 10 && (
+              <p className="text-xs text-error">End date must be on or after start date</p>
+            )}
+            {isLoading && (
+              <span className="text-xs text-on-surface-variant animate-pulse">Loading…</span>
+            )}
           </div>
-          {!isValidRange && startDate.length === 10 && endDate.length === 10 && (
-            <p className="text-xs text-error">End date must be on or after start date</p>
-          )}
-          {isLoading && (
-            <span className="text-xs text-on-surface-variant animate-pulse ml-2">Loading…</span>
-          )}
         </div>
 
         {isError && (
