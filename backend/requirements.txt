@@ -10,3 +10,5 @@ python-multipart==0.0.12
 pydantic[email]==2.11.1
 pydantic-settings==2.8.1
 python-dotenv==1.0.1
+slowapi==0.1.9
+qrcode==8.0

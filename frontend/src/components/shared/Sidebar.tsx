@@ -11,6 +11,7 @@ const ALL_NAV_ITEMS = [
   { to: '/lodge',     icon: 'bed',                label: 'Lodge' },
   { to: '/users',     icon: 'group',              label: 'Users' },
   { to: '/reports',   icon: 'analytics',          label: 'Reports' },
+  { to: '/settings',  icon: 'settings',            label: 'Settings' },
 ]
 
 const ROLE_LABELS: Record<string, string> = {

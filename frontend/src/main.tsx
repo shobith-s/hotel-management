@@ -15,6 +15,7 @@ import BillingPage from './pages/BillingPage'
 import LodgePage from './pages/LodgePage'
 import UsersPage from './pages/UsersPage'
 import ReportsPage from './pages/ReportsPage'
+import SettingsPage from './pages/SettingsPage'
 
 const queryClient = new QueryClient()
 
@@ -40,6 +41,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/lodge" element={<LodgePage />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>
 

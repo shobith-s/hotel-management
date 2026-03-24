@@ -1,3 +1,4 @@
+import io
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,16 +11,103 @@ from app.models.billing import Bill
 from app.models.enums import BookingStatus, UserRole
 from app.models.lodge import Booking
 from app.models.order import Order, OrderItem
+from app.api.v1.routes.settings import load_settings
+
+try:
+    import qrcode
+    import qrcode.image.svg
+    _QRCODE_OK = True
+except ImportError:
+    _QRCODE_OK = False
 
 router = APIRouter(prefix="/print", tags=["Print"])
 
-# ── Hotel constants (admin can configure these via settings page later) ────────
-HOTEL_NAME = "Hotel Sukhsagar (Desi Dhaba)"
-HOTEL_ADDRESS = "Miraj, Maharashtra"
-HOTEL_PHONE = ""
-HOTEL_GSTIN = ""
+
+# ── Amount in words (Indian number system) ────────────────────────────────────
+
+def _amount_in_words(amount: float) -> str:
+    _ones = [
+        '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+        'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+        'Seventeen', 'Eighteen', 'Nineteen',
+    ]
+    _tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+
+    def _two(n: int) -> str:
+        if n == 0:
+            return ''
+        if n < 20:
+            return _ones[n]
+        t = _tens[n // 10]
+        o = _ones[n % 10]
+        return t + (' ' + o if o else '')
+
+    def _three(n: int) -> str:
+        if n == 0:
+            return ''
+        h, rest = divmod(n, 100)
+        parts = []
+        if h:
+            parts.append(_ones[h] + ' Hundred')
+        td = _two(rest)
+        if td:
+            parts.append(td)
+        return ' '.join(parts)
+
+    rupees = int(amount)
+    paise = round((amount - rupees) * 100)
+
+    if rupees == 0 and paise == 0:
+        return 'Zero Rupees Only'
+
+    r = rupees
+    parts = []
+
+    if r >= 10_000_000:
+        c, r = divmod(r, 10_000_000)
+        w = _three(c)
+        if w:
+            parts.append(w + ' Crore')
+    if r >= 100_000:
+        lk, r = divmod(r, 100_000)
+        w = _two(lk)
+        if w:
+            parts.append(w + ' Lakh')
+    if r >= 1_000:
+        t, r = divmod(r, 1_000)
+        w = _two(t)
+        if w:
+            parts.append(w + ' Thousand')
+    if r > 0:
+        w = _three(r)
+        if w:
+            parts.append(w)
+
+    result = ' '.join(parts) + ' Rupees'
+    if paise > 0:
+        result += f' and {_two(paise)} Paise'
+    result += ' Only'
+    return result
+
+
+# ── QR code helper ─────────────────────────────────────────────────────────────
+
+def _upi_qr_svg(upi_id: str, amount: float, ref: str, name: str) -> str:
+    if not _QRCODE_OK:
+        return ''
+    upi_str = f"upi://pay?pa={upi_id}&pn={name}&am={amount:.2f}&cu=INR&tn={ref}"
+    factory = qrcode.image.svg.SvgPathImage
+    qr = qrcode.QRCode(box_size=4, border=2)
+    qr.add_data(upi_str)
+    qr.make(fit=True)
+    img = qr.make_image(image_factory=factory)
+    buf = io.BytesIO()
+    img.save(buf)
+    return buf.getvalue().decode('utf-8')
+
 
 # ── Shared print stylesheet ────────────────────────────────────────────────────
+
 _PRINT_CSS = """
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -45,7 +133,11 @@ _PRINT_CSS = """
   .total-row td { font-weight: bold; font-size: 15px; padding-top: 6px; }
   .meta-row { display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; }
   .label { color: #555; }
+  .total-words { font-size: 11px; color: #555; font-style: italic; margin-top: 4px; }
   .footer { text-align: center; font-size: 11px; color: #777; margin-top: 16px; }
+  .qr-wrap { text-align: center; margin: 12px 0 4px; }
+  .qr-wrap svg { width: 120px; height: 120px; }
+  .qr-label { font-size: 10px; color: #777; margin-top: 4px; }
   @media print {
     body { padding: 0; }
     .no-print { display: none; }
@@ -64,10 +156,8 @@ _PRINT_BUTTON = """
 
 
 def _fmt_dt(dt) -> str:
-    """Format datetime as DD/MM/YYYY HH:MM in local-naive display."""
     if dt is None:
         return "—"
-    # dt may be UTC-aware; display as-is without timezone conversion
     return dt.strftime("%d/%m/%Y %H:%M")
 
 
@@ -77,14 +167,14 @@ def _fmt_date(dt) -> str:
     return dt.strftime("%d/%m/%Y")
 
 
-def _hotel_header() -> str:
-    lines = [f'<p class="hotel-name">{HOTEL_NAME}</p>']
-    if HOTEL_ADDRESS:
-        lines.append(f'<p class="hotel-sub">{HOTEL_ADDRESS}</p>')
-    if HOTEL_PHONE:
-        lines.append(f'<p class="hotel-sub">Ph: {HOTEL_PHONE}</p>')
-    if HOTEL_GSTIN:
-        lines.append(f'<p class="hotel-sub">GSTIN: {HOTEL_GSTIN}</p>')
+def _hotel_header(s) -> str:
+    lines = [f'<p class="hotel-name">{s.name}</p>']
+    if s.address:
+        lines.append(f'<p class="hotel-sub">{s.address}</p>')
+    if s.phone:
+        lines.append(f'<p class="hotel-sub">Ph: {s.phone}</p>')
+    if s.gstin:
+        lines.append(f'<p class="hotel-sub">GSTIN: {s.gstin}</p>')
     return "\n".join(lines)
 
 
@@ -97,6 +187,8 @@ def print_bill(bill_id: uuid.UUID, token: str = Query(...), db: Session = Depend
 
 def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
     get_current_user_from_query(token, db)
+    s = load_settings()
+
     bill = (
         db.query(Bill)
         .options(
@@ -115,7 +207,6 @@ def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
     order = bill.order
     active_items = [i for i in order.items if not i.is_voided]
 
-    # Build items rows
     items_rows = ""
     for item in active_items:
         name = item.menu_item.name
@@ -152,6 +243,15 @@ def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
     payment_mode = (bill.payment_mode.value if bill.payment_mode else "Pending").upper()
     waiter_name  = order.waiter.name if order.waiter else "—"
     table_num    = order.table.table_number if order.table else "—"
+    total_words  = _amount_in_words(total)
+
+    qr_block = ""
+    if s.upi_id and _QRCODE_OK:
+        svg = _upi_qr_svg(s.upi_id, total, bill.bill_number, s.name)
+        qr_block = f"""
+  <hr class="divider">
+  <div class="qr-wrap">{svg}</div>
+  <p class="qr-label center">Scan to pay · UPI: {s.upi_id}</p>"""
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -163,7 +263,7 @@ def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
 </head>
 <body>
   <div class="center">
-    {_hotel_header()}
+    {_hotel_header(s)}
   </div>
 
   <hr class="divider">
@@ -203,11 +303,14 @@ def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
   <div class="meta-row bold" style="font-size:15px;">
     <span>TOTAL</span><span>₹{total:.2f}</span>
   </div>
+  <p class="total-words">{total_words}</p>
 
   <hr class="divider">
 
   <div class="meta-row"><span class="label">Payment</span><span class="bold">{payment_mode}</span></div>
   {"<div class='meta-row'><span class='label'>Paid At</span><span>" + _fmt_dt(bill.paid_at) + "</span></div>" if bill.paid_at else ""}
+
+  {qr_block}
 
   <hr class="divider">
 
@@ -234,6 +337,9 @@ def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
     user = get_current_user_from_query(token, db)
     if user.role not in (UserRole.admin, UserRole.manager, UserRole.receptionist):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    s = load_settings()
+
     booking: Booking | None = (
         db.query(Booking)
         .options(
@@ -250,9 +356,9 @@ def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
     if booking.status != BookingStatus.checked_out:
         raise HTTPException(status_code=400, detail="Booking has not been checked out yet")
 
-    guest   = booking.guest
-    room    = booking.room
-    rt      = room.room_type
+    guest = booking.guest
+    room  = booking.room
+    rt    = room.room_type
 
     nights = max(1, (booking.check_out_at - booking.check_in_at).days) if booking.check_out_at else 0
     nightly_rate = float(booking.nightly_rate)
@@ -261,7 +367,6 @@ def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
     gst_amount   = round(room_charge * gst_rate / 100, 2)
     advance      = float(booking.advance_paid)
 
-    # Extra charges (non-room)
     extra_rows = ""
     extra_total = 0.0
     for charge in booking.charges:
@@ -274,6 +379,7 @@ def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
             extra_total += float(charge.amount)
 
     grand_total = room_charge + gst_amount + extra_total - advance
+    total_words = _amount_in_words(max(grand_total, 0))
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -285,7 +391,7 @@ def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
 </head>
 <body>
   <div class="center">
-    {_hotel_header()}
+    {_hotel_header(s)}
   </div>
 
   <hr class="divider">
@@ -325,6 +431,7 @@ def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
   <div class="meta-row bold" style="font-size:15px;">
     <span>TOTAL</span><span>₹{grand_total:.2f}</span>
   </div>
+  <p class="total-words">{total_words}</p>
 
   <hr class="divider">
 

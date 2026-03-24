@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import { fetchTables, type Table } from '../api/tables'
@@ -7,6 +7,61 @@ import { createBill, getBillByOrder, settlePayment, type BillRead, type PaymentM
 import { openPrintPage } from '../api/client'
 
 type PaymentOption = { mode: PaymentMode; icon: string; label: string; sub: string }
+
+function SplitBillModal({ total, onClose }: { total: number; onClose: () => void }) {
+  const [splits, setSplits] = useState(2)
+  const perPerson = splits > 0 ? total / splits : 0
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-surface-container-lowest rounded-2xl shadow-modal w-full max-w-sm mx-4 p-8">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="font-headline text-xl font-bold text-primary">Split Bill</h3>
+          <button onClick={onClose} className="material-symbols-outlined text-on-surface-variant hover:text-primary">close</button>
+        </div>
+
+        <div className="text-center mb-6">
+          <p className="text-xs uppercase font-bold tracking-widest text-on-surface-variant mb-1">Total Amount</p>
+          <p className="font-headline text-3xl font-bold text-primary">₹{total.toFixed(2)}</p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-2">
+            Number of Guests
+          </label>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSplits((n) => Math.max(2, n - 1))}
+              className="w-10 h-10 rounded-full border border-outline-variant/40 flex items-center justify-center text-primary font-bold text-lg hover:bg-surface-container-low transition-colors"
+            >−</button>
+            <input
+              ref={inputRef}
+              type="number"
+              min={2}
+              max={20}
+              value={splits}
+              onChange={(e) => setSplits(Math.max(2, Math.min(20, parseInt(e.target.value) || 2)))}
+              className="flex-1 text-center bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-lg font-bold text-primary focus:outline-none focus:border-primary"
+            />
+            <button
+              onClick={() => setSplits((n) => Math.min(20, n + 1))}
+              className="w-10 h-10 rounded-full border border-outline-variant/40 flex items-center justify-center text-primary font-bold text-lg hover:bg-surface-container-low transition-colors"
+            >+</button>
+          </div>
+        </div>
+
+        <div className="bg-primary/5 rounded-xl p-5 text-center mb-6">
+          <p className="text-xs text-on-surface-variant mb-1">Each person pays</p>
+          <p className="font-headline text-3xl font-bold text-primary">₹{perPerson.toFixed(2)}</p>
+          <p className="text-xs text-on-surface-variant mt-1">{splits} equal shares</p>
+        </div>
+
+        <button onClick={onClose} className="w-full btn-primary py-3">Done</button>
+      </div>
+    </div>
+  )
+}
 
 const paymentOptions: PaymentOption[] = [
   { mode: 'cash', icon: 'payments', label: 'Cash', sub: 'Settle at Front Desk' },
@@ -27,6 +82,7 @@ export default function BillingPage() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash')
   const [bill, setBill] = useState<BillRead | null>(null)
   const [settled, setSettled] = useState(false)
+  const [splitOpen, setSplitOpen] = useState(false)
 
   const { data: tables = [], isLoading: tablesLoading } = useQuery<Table[]>({
     queryKey: ['tables'],
@@ -66,6 +122,7 @@ export default function BillingPage() {
     setSelectedTable(table)
     setBill(null)
     setSettled(false)
+    setSplitOpen(false)
   }
 
   function reset() {
@@ -85,6 +142,7 @@ export default function BillingPage() {
 
   return (
     <div className="min-h-screen">
+      {splitOpen && <SplitBillModal total={grandTotal} onClose={() => setSplitOpen(false)} />}
       <TopBar title="Billing & Checkout" />
 
       <main className="p-10 max-w-7xl mx-auto">
@@ -367,6 +425,15 @@ export default function BillingPage() {
                     >
                       <span className="material-symbols-outlined text-xl">check_circle</span>
                       {settleMutation.isPending ? 'Processing…' : 'Settle Payment'}
+                    </button>
+                  )}
+                  {bill && (
+                    <button
+                      onClick={() => setSplitOpen(true)}
+                      className="w-full py-3 flex items-center justify-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">call_split</span>
+                      Split Bill
                     </button>
                   )}
                   {bill && bill.payment_status === 'paid' && (
