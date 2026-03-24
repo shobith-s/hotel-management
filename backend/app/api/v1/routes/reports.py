@@ -1,16 +1,16 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.core.security import require_roles
 from app.models.billing import Bill
 from app.models.enums import BookingStatus, ChargeType, PaymentMode, PaymentStatus
-from app.models.lodge import Booking, BookingCharge
+from app.models.lodge import Booking, BookingCharge, Room, RoomType
 from app.models.menu import MenuItem
 from app.models.order import Order, OrderItem
 
@@ -177,4 +177,156 @@ def revenue_summary(
         top_items=top_rows,
         total_discount=round(total_discount, 2),
         void_summary=VoidSummary(count=void_count, value=void_value),
+    )
+
+
+# ── Lodge Occupancy Report ─────────────────────────────────────────────────────
+
+class DailyOccupancy(BaseModel):
+    date: str
+    occupied_rooms: int
+    occupancy_pct: float
+
+
+class RoomTypeBreakdown(BaseModel):
+    room_type: str
+    total_rooms: int
+    occupied_nights: int
+    revenue: float
+
+
+class OccupancyReport(BaseModel):
+    start_date: str
+    end_date: str
+    total_rooms: int
+    total_room_nights: int   # total_rooms × days in range
+    occupied_nights: int     # sum of all occupied room-nights
+    avg_occupancy_pct: float
+    revpar: float            # total_revenue / total_room_nights
+    adr: float               # total_revenue / occupied_nights
+    total_revenue: float
+    daily: List[DailyOccupancy]
+    by_room_type: List[RoomTypeBreakdown]
+
+
+@router.get("/occupancy", response_model=OccupancyReport, dependencies=[_admin_manager])
+def occupancy_report(
+    start: date = Query(..., description="Start date YYYY-MM-DD"),
+    end:   date = Query(..., description="End date YYYY-MM-DD (inclusive)"),
+    db: Session = Depends(get_db),
+):
+    start_dt = datetime.combine(start, time.min)
+    end_dt   = datetime.combine(end,   time.max)
+
+    total_rooms: int = db.query(func.count(Room.id)).scalar() or 0
+
+    # All bookings that overlap the date range
+    bookings = (
+        db.query(Booking)
+        .filter(
+            Booking.status.in_([BookingStatus.active, BookingStatus.checked_out]),
+            Booking.check_in_at <= end_dt,
+            or_(
+                Booking.check_out_at >= start_dt,
+                Booking.check_out_at.is_(None),
+            ),
+        )
+        .all()
+    )
+
+    # Daily occupancy — iterate each day in range
+    days: list[date] = []
+    d = start
+    while d <= end:
+        days.append(d)
+        d += timedelta(days=1)
+
+    daily_rows: list[DailyOccupancy] = []
+    total_occupied_nights = 0
+
+    for day in days:
+        count = 0
+        for b in bookings:
+            ci = b.check_in_at.date()
+            co = b.check_out_at.date() if b.check_out_at else (end + timedelta(days=1))
+            if ci <= day < co:
+                count += 1
+        pct = round(count / total_rooms * 100, 1) if total_rooms else 0.0
+        daily_rows.append(DailyOccupancy(date=str(day), occupied_rooms=count, occupancy_pct=pct))
+        total_occupied_nights += count
+
+    avg_occupancy = round(total_occupied_nights / (total_rooms * len(days)) * 100, 1) if total_rooms and days else 0.0
+
+    # Revenue: room charges from checked-out bookings in range
+    room_charges = (
+        db.query(BookingCharge)
+        .join(Booking, BookingCharge.booking_id == Booking.id)
+        .filter(
+            BookingCharge.charge_type == ChargeType.room,
+            Booking.status == BookingStatus.checked_out,
+            Booking.check_out_at >= start_dt,
+            Booking.check_out_at <= end_dt,
+        )
+        .all()
+    )
+    total_revenue = round(sum(float(c.amount) for c in room_charges), 2)
+
+    total_room_nights = total_rooms * len(days)
+    revpar = round(total_revenue / total_room_nights, 2) if total_room_nights else 0.0
+    adr    = round(total_revenue / total_occupied_nights, 2) if total_occupied_nights else 0.0
+
+    # Room type breakdown
+    room_types = (
+        db.query(RoomType)
+        .options(joinedload(RoomType.rooms))
+        .all()
+    )
+
+    breakdown: list[RoomTypeBreakdown] = []
+    for rt in room_types:
+        rt_room_ids = {r.id for r in rt.rooms}
+        if not rt_room_ids:
+            continue
+        rt_bookings = [b for b in bookings if b.room_id in rt_room_ids]
+
+        occ_nights = 0
+        for day in days:
+            for b in rt_bookings:
+                ci = b.check_in_at.date()
+                co = b.check_out_at.date() if b.check_out_at else (end + timedelta(days=1))
+                if ci <= day < co:
+                    occ_nights += 1
+
+        rt_booking_ids = [b.id for b in rt_bookings if b.status == BookingStatus.checked_out
+                          and b.check_out_at and start_dt <= b.check_out_at <= end_dt]
+        rt_revenue = 0.0
+        if rt_booking_ids:
+            rt_revenue = float(
+                db.query(func.sum(BookingCharge.amount))
+                .filter(
+                    BookingCharge.booking_id.in_(rt_booking_ids),
+                    BookingCharge.charge_type == ChargeType.room,
+                )
+                .scalar() or 0
+            )
+
+        breakdown.append(RoomTypeBreakdown(
+            room_type=rt.name,
+            total_rooms=len(rt_room_ids),
+            occupied_nights=occ_nights,
+            revenue=round(rt_revenue, 2),
+        ))
+
+    return OccupancyReport(
+        start_date=str(start),
+        end_date=str(end),
+        total_rooms=total_rooms,
+        total_room_nights=total_room_nights,
+        occupied_nights=total_occupied_nights,
+        avg_occupancy_pct=avg_occupancy,
+        revpar=revpar,
+        adr=adr,
+        total_revenue=total_revenue,
+        daily=daily_rows,
+        by_room_type=breakdown,
     )

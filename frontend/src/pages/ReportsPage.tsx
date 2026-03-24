@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
-import { getRevenueSummary, type RevenueReport, type TopItem } from '../api/reports'
+import {
+  getRevenueSummary, type RevenueReport, type TopItem,
+  getOccupancyReport, type OccupancyReport, type DailyOccupancy, type RoomTypeBreakdown,
+} from '../api/reports'
 
 // ── Date helpers (same pattern as LodgePage) ──────────────────────────────────
 
@@ -121,6 +124,139 @@ function PaymentRow({ mode, amount, total }: { mode: string; amount: number; tot
   )
 }
 
+// ── Occupancy bar chart ───────────────────────────────────────────────────────
+
+function OccupancyBar({ day }: { day: DailyOccupancy }) {
+  const pct = day.occupancy_pct
+  const color = pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-primary' : 'bg-primary/40'
+  const label = new Date(day.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  return (
+    <div className="flex flex-col items-center gap-1 flex-1 min-w-0" title={`${label}: ${pct}%`}>
+      <span className="text-xs text-primary font-bold">{pct > 0 ? `${pct}%` : ''}</span>
+      <div className="w-full bg-surface-container-low rounded-sm" style={{ height: 80 }}>
+        <div
+          className={`w-full rounded-sm transition-all duration-500 ${color}`}
+          style={{ height: `${pct}%`, marginTop: `${100 - pct}%` }}
+        />
+      </div>
+      <span className="text-xs text-on-surface-variant truncate w-full text-center">{label}</span>
+    </div>
+  )
+}
+
+// ── Occupancy tab ─────────────────────────────────────────────────────────────
+
+function OccupancyTab({ data }: { data: OccupancyReport }) {
+  return (
+    <>
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <StatCard
+          icon="hotel"
+          label="Avg Occupancy"
+          value={`${data.avg_occupancy_pct}%`}
+          sub={`${data.occupied_nights} of ${data.total_room_nights} room-nights`}
+          color={data.avg_occupancy_pct >= 70 ? 'text-emerald-600' : 'text-primary'}
+        />
+        <StatCard
+          icon="currency_rupee"
+          label="RevPAR"
+          value={`₹${data.revpar.toLocaleString('en-IN')}`}
+          sub="Revenue per available room"
+        />
+        <StatCard
+          icon="trending_up"
+          label="ADR"
+          value={`₹${data.adr.toLocaleString('en-IN')}`}
+          sub="Avg daily rate (occupied)"
+        />
+        <StatCard
+          icon="bed"
+          label="Room Revenue"
+          value={`₹${data.total_revenue.toLocaleString('en-IN')}`}
+          sub={`${data.total_rooms} total rooms`}
+        />
+      </div>
+
+      {/* Daily bar chart */}
+      <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card mb-8">
+        <h2 className="font-headline text-lg font-bold text-primary mb-5">Daily Occupancy</h2>
+        {data.daily.length === 0 ? (
+          <p className="text-sm text-on-surface-variant text-center py-6">No data</p>
+        ) : data.daily.length <= 31 ? (
+          <div className="flex gap-1 items-end overflow-x-auto pb-2">
+            {data.daily.map((d) => <OccupancyBar key={d.date} day={d} />)}
+          </div>
+        ) : (
+          /* For longer ranges show a compact table */
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-surface-container-low/50">
+                  {['Date', 'Occupied', 'Occupancy %'].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-on-surface-variant">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {data.daily.map((d) => (
+                  <tr key={d.date} className="hover:bg-surface-container-low/30">
+                    <td className="px-4 py-2 text-primary font-medium">{new Date(d.date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                    <td className="px-4 py-2 text-on-surface-variant">{d.occupied_rooms} / {data.total_rooms}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-surface-container-low rounded-full h-2 max-w-24">
+                          <div className={`h-2 rounded-full ${d.occupancy_pct >= 80 ? 'bg-emerald-500' : d.occupancy_pct >= 50 ? 'bg-primary' : 'bg-primary/40'}`} style={{ width: `${d.occupancy_pct}%` }} />
+                        </div>
+                        <span className="font-bold text-primary w-10">{d.occupancy_pct}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Room type breakdown */}
+      {data.by_room_type.length > 0 && (
+        <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card">
+          <h2 className="font-headline text-lg font-bold text-primary mb-5">Room Type Breakdown</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-surface-container-low/50">
+                {['Room Type', 'Total Rooms', 'Occupied Nights', 'Occupancy %', 'Revenue'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-on-surface-variant">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/10">
+              {data.by_room_type.map((rt: RoomTypeBreakdown) => {
+                const maxNights = rt.total_rooms * data.daily.length
+                const occ = maxNights > 0 ? Math.round(rt.occupied_nights / maxNights * 100) : 0
+                return (
+                  <tr key={rt.room_type} className="hover:bg-surface-container-low/30">
+                    <td className="px-4 py-3 font-bold text-primary">{rt.room_type}</td>
+                    <td className="px-4 py-3 text-on-surface-variant">{rt.total_rooms}</td>
+                    <td className="px-4 py-3 text-on-surface-variant">{rt.occupied_nights}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${occ >= 70 ? 'bg-emerald-100 text-emerald-700' : 'bg-surface-container text-on-surface-variant'}`}>
+                        {occ}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-bold text-primary">₹{rt.revenue.toLocaleString('en-IN')}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 function todayStr() { return toDateStr(new Date()) }
@@ -131,19 +267,30 @@ function firstOfMonthStr() {
 }
 
 export default function ReportsPage() {
+  const [tab, setTab]           = useState<'revenue' | 'occupancy'>('revenue')
   const [startDate, setStartDate] = useState(firstOfMonthStr())
   const [endDate,   setEndDate]   = useState(todayStr())
 
   const isValidRange = startDate.length === 10 && endDate.length === 10 && startDate <= endDate
 
-  const { data, isLoading, isError, error } = useQuery<RevenueReport>({
-    queryKey: ['reports', startDate, endDate],
+  const { data: revenueData, isLoading: revLoading, isError: revError, error: revErr } = useQuery<RevenueReport>({
+    queryKey: ['reports', 'revenue', startDate, endDate],
     queryFn:  () => getRevenueSummary(startDate, endDate),
-    enabled:  isValidRange,
+    enabled:  isValidRange && tab === 'revenue',
   })
 
-  const paymentTotal = data
-    ? Object.values(data.payment_modes).reduce((s, v) => s + v, 0)
+  const { data: occData, isLoading: occLoading, isError: occError, error: occErr } = useQuery<OccupancyReport>({
+    queryKey: ['reports', 'occupancy', startDate, endDate],
+    queryFn:  () => getOccupancyReport(startDate, endDate),
+    enabled:  isValidRange && tab === 'occupancy',
+  })
+
+  const isLoading = tab === 'revenue' ? revLoading : occLoading
+  const isError   = tab === 'revenue' ? revError   : occError
+  const error     = tab === 'revenue' ? revErr     : occErr
+
+  const paymentTotal = revenueData
+    ? Object.values(revenueData.payment_modes).reduce((s, v) => s + v, 0)
     : 0
 
   return (
@@ -151,13 +298,26 @@ export default function ReportsPage() {
       <TopBar />
       <div className="p-10 max-w-5xl mx-auto">
         {/* Header */}
-        <div className="mb-10">
-          <h1 className="font-headline text-4xl font-bold text-primary tracking-tight">Revenue Reports</h1>
-          <p className="text-on-surface-variant mt-1 text-sm">Daily reconciliation and payment summary</p>
+        <div className="mb-8">
+          <h1 className="font-headline text-4xl font-bold text-primary tracking-tight">Reports</h1>
+          <p className="text-on-surface-variant mt-1 text-sm">Revenue reconciliation and lodge occupancy</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex rounded-full overflow-hidden border border-outline-variant/20 text-sm mb-8 w-fit">
+          {([['revenue', 'Revenue'], ['occupancy', 'Occupancy']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-6 py-2.5 font-bold transition-all ${tab === key ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Date range picker */}
-        <div className="flex items-center gap-4 mb-10 bg-surface-container-lowest rounded-2xl p-5 shadow-card">
+        <div className="flex items-center gap-4 mb-8 bg-surface-container-lowest rounded-2xl p-5 shadow-card flex-wrap">
           <span className="material-symbols-outlined text-on-surface-variant">date_range</span>
           <div className="flex items-center gap-3">
             <span className="text-sm text-on-surface-variant font-medium">From</span>
@@ -181,88 +341,41 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {data && (
+        {/* Revenue tab */}
+        {tab === 'revenue' && revenueData && (
           <>
-            {/* Summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <StatCard
-                icon="account_balance_wallet"
-                label="Total Revenue"
-                value={`₹${data.total_revenue.toLocaleString('en-IN')}`}
-                color="text-primary"
-              />
-              <StatCard
-                icon="restaurant"
-                label="Restaurant"
-                value={`₹${data.restaurant_revenue.toLocaleString('en-IN')}`}
-                sub={`${data.total_bills} bill${data.total_bills !== 1 ? 's' : ''} · avg ₹${data.avg_spend_per_bill.toLocaleString('en-IN')}`}
-              />
-              <StatCard
-                icon="bed"
-                label="Lodge"
-                value={`₹${data.lodge_revenue.toLocaleString('en-IN')}`}
-                sub={`${data.total_checkouts} checkout${data.total_checkouts !== 1 ? 's' : ''}`}
-              />
-              <StatCard
-                icon="receipt_long"
-                label="GST Collected"
-                value={`₹${data.restaurant_gst.toLocaleString('en-IN')}`}
-                sub="Restaurant GST"
-                color="text-amber-600"
-              />
+              <StatCard icon="account_balance_wallet" label="Total Revenue" value={`₹${revenueData.total_revenue.toLocaleString('en-IN')}`} color="text-primary" />
+              <StatCard icon="restaurant" label="Restaurant" value={`₹${revenueData.restaurant_revenue.toLocaleString('en-IN')}`} sub={`${revenueData.total_bills} bill${revenueData.total_bills !== 1 ? 's' : ''} · avg ₹${revenueData.avg_spend_per_bill.toLocaleString('en-IN')}`} />
+              <StatCard icon="bed" label="Lodge" value={`₹${revenueData.lodge_revenue.toLocaleString('en-IN')}`} sub={`${revenueData.total_checkouts} checkout${revenueData.total_checkouts !== 1 ? 's' : ''}`} />
+              <StatCard icon="receipt_long" label="GST Collected" value={`₹${revenueData.restaurant_gst.toLocaleString('en-IN')}`} sub="Restaurant GST" color="text-amber-600" />
             </div>
-
-            {/* Second row: discount + void */}
             <div className="grid grid-cols-2 gap-4 mb-8">
-              <StatCard
-                icon="local_offer"
-                label="Total Discounts"
-                value={`₹${data.total_discount.toLocaleString('en-IN')}`}
-                sub="Applied across all bills"
-                color="text-secondary"
-              />
-              <StatCard
-                icon="cancel"
-                label="Voided Items"
-                value={String(data.void_summary.count)}
-                sub={`₹${data.void_summary.value.toLocaleString('en-IN')} lost revenue`}
-                color="text-error"
-              />
+              <StatCard icon="local_offer" label="Total Discounts" value={`₹${revenueData.total_discount.toLocaleString('en-IN')}`} sub="Applied across all bills" color="text-secondary" />
+              <StatCard icon="cancel" label="Voided Items" value={String(revenueData.void_summary.count)} sub={`₹${revenueData.void_summary.value.toLocaleString('en-IN')} lost revenue`} color="text-error" />
             </div>
-
-            {/* Top 10 items + Payment mode side by side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {/* Top 10 selling items */}
               <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card">
                 <h2 className="font-headline text-lg font-bold text-primary mb-5">Top Selling Items</h2>
-                {data.top_items.length === 0 ? (
+                {revenueData.top_items.length === 0 ? (
                   <p className="text-sm text-on-surface-variant text-center py-6">No sales data in this range</p>
                 ) : (
                   <div className="space-y-4">
-                    {data.top_items.map((item, i) => (
-                      <TopItemRow
-                        key={item.name}
-                        item={item}
-                        rank={i + 1}
-                        maxRevenue={data.top_items[0]?.revenue ?? 1}
-                      />
+                    {revenueData.top_items.map((item, i) => (
+                      <TopItemRow key={item.name} item={item} rank={i + 1} maxRevenue={revenueData.top_items[0]?.revenue ?? 1} />
                     ))}
                   </div>
                 )}
               </div>
-
-              {/* Payment mode breakdown */}
               <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card">
                 <h2 className="font-headline text-lg font-bold text-primary mb-5">Payment Mode Breakdown</h2>
                 {paymentTotal === 0 ? (
                   <p className="text-sm text-on-surface-variant text-center py-6">No paid bills in this date range</p>
                 ) : (
                   <div className="space-y-4">
-                    {Object.entries(data.payment_modes)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([mode, amount]) => (
-                        <PaymentRow key={mode} mode={mode} amount={amount} total={paymentTotal} />
-                      ))}
+                    {Object.entries(revenueData.payment_modes).sort(([, a], [, b]) => b - a).map(([mode, amount]) => (
+                      <PaymentRow key={mode} mode={mode} amount={amount} total={paymentTotal} />
+                    ))}
                   </div>
                 )}
               </div>
@@ -270,7 +383,11 @@ export default function ReportsPage() {
           </>
         )}
 
-        {!data && !isLoading && isValidRange && !isError && (
+        {/* Occupancy tab */}
+        {tab === 'occupancy' && occData && <OccupancyTab data={occData} />}
+
+        {/* Empty states */}
+        {!isLoading && !isError && isValidRange && ((tab === 'revenue' && !revenueData) || (tab === 'occupancy' && !occData)) && (
           <div className="text-center py-20 text-on-surface-variant">
             <span className="material-symbols-outlined text-5xl block opacity-30 mb-3">analytics</span>
             <p className="text-sm font-medium">Select a date range to view the report</p>
