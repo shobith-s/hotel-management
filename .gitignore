@@ -16,6 +16,9 @@ env/
 .env.local
 .env.*.local
 
+# Hotel settings (contains sensitive info: GSTIN, UPI ID, phone)
+backend/data/hotel_settings.json
+
 # Alembic
 # (keep versions tracked)
 
