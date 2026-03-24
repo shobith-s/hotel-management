@@ -128,10 +128,10 @@ export default function DashboardPage() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-surface-container-low/50">
-                    {['Table', 'Capacity', 'Status', 'Action'].map((h) => (
+                    {['Table', 'Capacity', 'Status'].map((h) => (
                       <th
                         key={h}
-                        className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant last:text-right"
+                        className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-on-surface-variant"
                       >
                         {h}
                       </th>
@@ -147,11 +147,6 @@ export default function DashboardPage() {
                         <span className={statusBadge[t.status] ?? 'badge-available'}>
                           {statusLabel[t.status] ?? t.status}
                         </span>
-                      </td>
-                      <td className="px-6 py-5 text-right">
-                        <button className="material-symbols-outlined text-primary/40 hover:text-primary transition-colors">
-                          more_horiz
-                        </button>
                       </td>
                     </tr>
                   ))}
