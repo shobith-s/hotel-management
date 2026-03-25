@@ -71,6 +71,6 @@ export async function addItemsToOrder(orderId: string, items: OrderItemCreate[],
 }
 
 export async function voidItem(orderId: string, itemId: string, reason: string): Promise<OrderItemRead> {
-  const res = await api.post<OrderItemRead>(`/orders/${orderId}/items/${itemId}/void`, { reason })
+  const res = await api.post<OrderItemRead>(`/orders/${orderId}/items/${itemId}/void`, { void_reason: reason })
   return res.data
 }
