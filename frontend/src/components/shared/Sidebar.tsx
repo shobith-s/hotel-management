@@ -15,6 +15,7 @@ const ALL_NAV_ITEMS = [
   { to: '/users',     icon: 'group',              label: 'Users' },
   { to: '/reports',   icon: 'analytics',          label: 'Reports' },
   { to: '/settings',  icon: 'settings',            label: 'Settings' },
+  { to: '/audit',     icon: 'manage_search',       label: 'Audit Log' },
 ]
 
 const ROLE_LABELS: Record<string, string> = {

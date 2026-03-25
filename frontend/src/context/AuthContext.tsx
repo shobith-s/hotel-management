@@ -26,8 +26,8 @@ export function useAuth() {
 
 // Pages each role can access — first entry is their home (redirect target)
 export const ROLE_ALLOWED_PATHS: Record<UserRole, string[]> = {
-  admin:        ['/dashboard', '/menu', '/orders', '/kds', '/billing', '/lodge', '/users', '/reports', '/settings'],
-  manager:      ['/dashboard', '/menu', '/orders', '/kds', '/billing', '/lodge', '/users', '/reports'],
+  admin:        ['/dashboard', '/menu', '/orders', '/kds', '/billing', '/lodge', '/users', '/reports', '/settings', '/audit'],
+  manager:      ['/dashboard', '/menu', '/orders', '/kds', '/billing', '/lodge', '/users', '/reports', '/audit'],
   waiter:       ['/dashboard', '/orders', '/kds'],
   receptionist: ['/dashboard', '/billing', '/lodge'],
 }

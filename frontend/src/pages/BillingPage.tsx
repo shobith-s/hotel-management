@@ -6,6 +6,25 @@ import { getActiveOrderForTable, type OrderRead } from '../api/orders'
 import { createBill, getBillByOrder, settlePayment, type BillRead, type PaymentMode } from '../api/billing'
 import { openPrintPage } from '../api/client'
 
+function shareOnWhatsApp(bill: BillRead, tableNumber: string, items: { name: string; qty: number; total: number }[]) {
+  const lines = [
+    `*Bill — ${tableNumber}*`,
+    `Bill No: ${bill.bill_number}`,
+    '',
+    ...items.map(i => `• ${i.name} ×${i.qty} — ₹${i.total.toFixed(2)}`),
+    '',
+    `Subtotal: ₹${(bill.grand_total - bill.cgst_amount - bill.sgst_amount - bill.igst_amount + bill.discount_amount).toFixed(2)}`,
+    bill.cgst_amount > 0 ? `GST: ₹${(bill.cgst_amount + bill.sgst_amount + bill.igst_amount).toFixed(2)}` : null,
+    bill.discount_amount > 0 ? `Discount: −₹${bill.discount_amount.toFixed(2)}` : null,
+    `*Total: ₹${bill.grand_total.toFixed(2)}*`,
+    '',
+    `Payment: ${bill.payment_mode?.toUpperCase() ?? ''}`,
+    'Thank you for visiting! 🙏',
+  ].filter(Boolean).join('\n')
+
+  window.open(`https://wa.me/?text=${encodeURIComponent(lines)}`, '_blank')
+}
+
 type PaymentOption = { mode: PaymentMode; icon: string; label: string; sub: string }
 
 function SplitBillModal({ total, onClose }: { total: number; onClose: () => void }) {
@@ -236,15 +255,24 @@ export default function BillingPage() {
               {selectedTable.table_number} · Bill {bill?.bill_number}
             </p>
             <p className="font-bold text-2xl text-primary mb-8">₹{grandTotal.toFixed(2)}</p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center flex-wrap">
               {bill && (
-                <button
-                  onClick={() => openPrintPage(`/print/bill/${bill.id}`)}
-                  className="px-8 py-3 flex items-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
-                >
-                  <span className="material-symbols-outlined">print</span>
-                  Print Bill
-                </button>
+                <>
+                  <button
+                    onClick={() => openPrintPage(`/print/bill/${bill.id}`)}
+                    className="px-8 py-3 flex items-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
+                  >
+                    <span className="material-symbols-outlined">print</span>
+                    Print Bill
+                  </button>
+                  <button
+                    onClick={() => shareOnWhatsApp(bill, selectedTable!.table_number, activeItems.map(i => ({ name: i.menu_item.name, qty: i.quantity, total: i.unit_price * i.quantity })))}
+                    className="px-8 py-3 flex items-center gap-2 border border-outline-variant/40 rounded-xl text-emerald-600 font-medium hover:bg-emerald-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined">share</span>
+                    WhatsApp
+                  </button>
+                </>
               )}
               <button onClick={reset} className="btn-primary px-8 py-3">
                 Back to Tables
@@ -437,13 +465,22 @@ export default function BillingPage() {
                     </button>
                   )}
                   {bill && bill.payment_status === 'paid' && (
-                    <button
-                      onClick={() => openPrintPage(`/print/bill/${bill.id}`)}
-                      className="w-full py-3 flex items-center justify-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">print</span>
-                      Print Bill
-                    </button>
+                    <>
+                      <button
+                        onClick={() => openPrintPage(`/print/bill/${bill.id}`)}
+                        className="w-full py-3 flex items-center justify-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-xl">print</span>
+                        Print Bill
+                      </button>
+                      <button
+                        onClick={() => shareOnWhatsApp(bill, selectedTable!.table_number, activeItems.map(i => ({ name: i.menu_item.name, qty: i.quantity, total: i.unit_price * i.quantity })))}
+                        className="w-full py-3 flex items-center justify-center gap-2 border border-emerald-200 rounded-xl text-emerald-600 font-medium hover:bg-emerald-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-xl">share</span>
+                        Share on WhatsApp
+                      </button>
+                    </>
                   )}
                   {generateBillMutation.isError && (
                     <p className="text-xs text-error text-center">

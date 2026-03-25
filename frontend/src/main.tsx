@@ -17,6 +17,7 @@ import UsersPage from './pages/UsersPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
+import AuditLogPage from './pages/AuditLogPage'
 
 const queryClient = new QueryClient()
 
@@ -45,6 +46,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/users" element={<UsersPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/audit" element={<AuditLogPage />} />
             </Route>
           </Route>
 
