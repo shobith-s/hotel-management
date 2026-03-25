@@ -202,14 +202,29 @@ export default function BillingPage() {
               <button onClick={() => { setVoidTarget(null); setVoidReason('') }} className="material-symbols-outlined text-on-surface-variant hover:text-primary">close</button>
             </div>
             <p className="text-sm text-on-surface-variant">Voiding: <span className="font-bold text-primary">{voidTarget.itemName}</span></p>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Reason <span className="text-error">*</span></label>
+              <div className="flex flex-wrap gap-2">
+                {['Customer changed mind', 'Wrong item ordered', 'Item unavailable', 'Duplicate entry', 'Other'].map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setVoidReason(r === 'Other' ? '' : r)}
+                    className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                      voidReason === r || (r === 'Other' && !['Customer changed mind','Wrong item ordered','Item unavailable','Duplicate entry'].includes(voidReason))
+                        ? 'bg-primary text-on-primary border-primary'
+                        : 'border-outline-variant/40 text-on-surface-variant hover:border-primary hover:text-primary'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
               <input
-                className="input"
-                placeholder="e.g. Customer changed mind"
+                className="input mt-1"
+                placeholder="Or type a custom reason…"
                 value={voidReason}
                 onChange={e => setVoidReason(e.target.value)}
-                autoFocus
               />
             </div>
             {voidMutation.isError && (
