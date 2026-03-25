@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import { fetchTables, type Table } from '../api/tables'
-import { getActiveOrderForTable, type OrderRead } from '../api/orders'
+import { getActiveOrderForTable, voidItem, type OrderRead } from '../api/orders'
 import { createBill, getBillByOrder, settlePayment, type BillRead, type PaymentMode } from '../api/billing'
 import { openPrintPage } from '../api/client'
 
@@ -103,6 +103,14 @@ export default function BillingPage() {
   const [settled, setSettled] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
 
+  // Void item
+  const [voidTarget, setVoidTarget] = useState<{ itemId: string; itemName: string } | null>(null)
+  const [voidReason, setVoidReason] = useState('')
+
+  // Discount & service charge
+  const [discountInput, setDiscountInput] = useState<string>('')
+  const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false)
+
   const { data: tables = [], isLoading: tablesLoading } = useQuery<Table[]>({
     queryKey: ['tables'],
     queryFn: fetchTables,
@@ -118,14 +126,26 @@ export default function BillingPage() {
 
   const generateBillMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      // Check if bill already exists
       try {
         return await getBillByOrder(orderId)
       } catch {
-        return await createBill({ order_id: orderId })
+        return await createBill({
+          order_id: orderId,
+          discount_amount: discountAmt || undefined,
+          service_charge: serviceChargeAmt || undefined,
+        })
       }
     },
     onSuccess: (b) => setBill(b),
+  })
+
+  const voidMutation = useMutation({
+    mutationFn: () => voidItem(order!.id, voidTarget!.itemId, voidReason),
+    onSuccess: () => {
+      setVoidTarget(null)
+      setVoidReason('')
+      qc.invalidateQueries({ queryKey: ['order-for-table', selectedTable?.id] })
+    },
   })
 
   const settleMutation = useMutation({
@@ -142,12 +162,16 @@ export default function BillingPage() {
     setBill(null)
     setSettled(false)
     setSplitOpen(false)
+    setDiscountInput('')
+    setServiceChargeEnabled(false)
   }
 
   function reset() {
     setSelectedTable(null)
     setBill(null)
     setSettled(false)
+    setDiscountInput('')
+    setServiceChargeEnabled(false)
     qc.invalidateQueries({ queryKey: ['tables'] })
   }
 
@@ -156,12 +180,53 @@ export default function BillingPage() {
 
   const activeItems = order?.items.filter((i) => !i.is_voided) ?? []
   const subtotal = activeItems.reduce((s, i) => s + i.unit_price * i.quantity, 0)
+  const discountAmt = parseFloat(discountInput) || 0
+  const serviceChargeAmt = serviceChargeEnabled ? Math.round(subtotal * 0.1) : 0
   const gstTotal = bill ? bill.cgst_amount + bill.sgst_amount + bill.igst_amount : Math.round(subtotal * 0.05)
-  const grandTotal = bill ? bill.grand_total : subtotal + gstTotal
+  const grandTotal = bill
+    ? bill.grand_total
+    : subtotal + gstTotal + serviceChargeAmt - discountAmt
 
   return (
     <div className="min-h-screen">
       {splitOpen && <SplitBillModal total={grandTotal} onClose={() => setSplitOpen(false)} />}
+
+      {/* Void item modal */}
+      {voidTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-headline text-lg font-bold text-primary">Void Item</h3>
+              <button onClick={() => { setVoidTarget(null); setVoidReason('') }} className="material-symbols-outlined text-on-surface-variant hover:text-primary">close</button>
+            </div>
+            <p className="text-sm text-on-surface-variant">Voiding: <span className="font-bold text-primary">{voidTarget.itemName}</span></p>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Reason <span className="text-error">*</span></label>
+              <input
+                className="input"
+                placeholder="e.g. Customer changed mind"
+                value={voidReason}
+                onChange={e => setVoidReason(e.target.value)}
+                autoFocus
+              />
+            </div>
+            {voidMutation.isError && (
+              <p className="text-xs text-error">{(voidMutation.error as any)?.response?.data?.detail ?? 'Failed to void item.'}</p>
+            )}
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => { setVoidTarget(null); setVoidReason('') }} className="flex-1 py-2.5 rounded-xl border border-outline-variant/40 text-on-surface-variant text-sm font-medium hover:bg-surface-container-low">Cancel</button>
+              <button
+                onClick={() => voidMutation.mutate()}
+                disabled={!voidReason.trim() || voidMutation.isPending}
+                className="flex-1 py-2.5 rounded-xl bg-error text-white text-sm font-bold disabled:opacity-40"
+              >
+                {voidMutation.isPending ? 'Voiding…' : 'Void Item'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <TopBar title="Billing & Checkout" />
 
       <main className="p-10 max-w-7xl mx-auto">
@@ -316,8 +381,8 @@ export default function BillingPage() {
                   ) : (
                     <div className="divide-y divide-outline-variant/10">
                       {activeItems.map((item) => (
-                        <div key={item.id} className="px-6 py-4 flex justify-between items-center">
-                          <div>
+                        <div key={item.id} className="px-6 py-4 flex justify-between items-center gap-3 group">
+                          <div className="flex-1 min-w-0">
                             <span className="font-bold text-primary text-sm">{item.menu_item.name}</span>
                             {item.variant && (
                               <span className="text-xs text-on-surface-variant ml-2">({item.variant.label})</span>
@@ -334,6 +399,15 @@ export default function BillingPage() {
                               {item.quantity} × ₹{item.unit_price}
                             </p>
                           </div>
+                          {!bill && (
+                            <button
+                              onClick={() => setVoidTarget({ itemId: item.id, itemName: item.menu_item.name })}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity w-7 h-7 rounded-full flex items-center justify-center text-error/60 hover:text-error hover:bg-error/10 shrink-0"
+                              title="Void item"
+                            >
+                              <span className="material-symbols-outlined text-base">block</span>
+                            </button>
+                          )}
                         </div>
                       ))}
                       {activeItems.length === 0 && !orderLoading && (
@@ -408,6 +482,12 @@ export default function BillingPage() {
                           <span className="font-bold text-primary">₹{bill.igst_amount.toFixed(2)}</span>
                         </div>
                       )}
+                      {bill.service_charge > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-on-surface-variant">Service Charge</span>
+                          <span className="font-bold text-primary">₹{bill.service_charge.toFixed(2)}</span>
+                        </div>
+                      )}
                       {bill.discount_amount > 0 && (
                         <div className="flex justify-between text-sm">
                           <span className="text-on-surface-variant">Discount</span>
@@ -416,10 +496,48 @@ export default function BillingPage() {
                       )}
                     </>
                   ) : (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-on-surface-variant">GST (est.)</span>
-                      <span className="font-bold text-primary">₹{gstTotal.toFixed(2)}</span>
-                    </div>
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-on-surface-variant">GST (est.)</span>
+                        <span className="font-bold text-primary">₹{gstTotal.toFixed(2)}</span>
+                      </div>
+
+                      {/* Service charge toggle */}
+                      <div className="flex items-center justify-between text-sm">
+                        <label className="flex items-center gap-2 cursor-pointer text-on-surface-variant">
+                          <input
+                            type="checkbox"
+                            checked={serviceChargeEnabled}
+                            onChange={e => setServiceChargeEnabled(e.target.checked)}
+                            className="rounded accent-primary"
+                          />
+                          Service Charge (10%)
+                        </label>
+                        {serviceChargeEnabled && (
+                          <span className="font-bold text-primary">₹{serviceChargeAmt.toFixed(2)}</span>
+                        )}
+                      </div>
+
+                      {/* Discount input */}
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-on-surface-variant shrink-0">Discount (₹)</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={subtotal}
+                          placeholder="0"
+                          value={discountInput}
+                          onChange={e => setDiscountInput(e.target.value)}
+                          className="ml-auto w-24 text-right bg-surface-container-low border border-outline-variant/30 rounded-lg px-2 py-1 text-sm font-bold text-emerald-600 focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      {discountAmt > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-on-surface-variant">After Discount</span>
+                          <span className="font-bold text-emerald-600">−₹{discountAmt.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="pt-4 border-t border-dashed border-outline-variant/30">
                     <div className="flex justify-between items-end">
