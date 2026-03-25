@@ -124,6 +124,19 @@ export default function BillingPage() {
     retry: false,
   })
 
+  // Derived values — computed BEFORE mutations so closures can safely reference them
+  const billRequestedTables = tables.filter((t) => t.status === 'bill_requested')
+  const occupiedTables = tables.filter((t) => t.status === 'occupied')
+
+  const activeItems = order?.items.filter((i) => !i.is_voided) ?? []
+  const subtotal = activeItems.reduce((s, i) => s + i.unit_price * i.quantity, 0)
+  const discountAmt = parseFloat(discountInput) || 0
+  const serviceChargeAmt = serviceChargeEnabled ? Math.round(subtotal * 0.1) : 0
+  const gstTotal = bill ? bill.cgst_amount + bill.sgst_amount + bill.igst_amount : Math.round(subtotal * 0.05)
+  const grandTotal = bill
+    ? bill.grand_total
+    : subtotal + gstTotal + serviceChargeAmt - discountAmt
+
   const generateBillMutation = useMutation({
     mutationFn: async (orderId: string) => {
       try {
@@ -140,7 +153,8 @@ export default function BillingPage() {
   })
 
   const voidMutation = useMutation({
-    mutationFn: () => voidItem(order!.id, voidTarget!.itemId, voidReason),
+    mutationFn: ({ orderId, itemId, reason }: { orderId: string; itemId: string; reason: string }) =>
+      voidItem(orderId, itemId, reason),
     onSuccess: () => {
       setVoidTarget(null)
       setVoidReason('')
@@ -175,18 +189,6 @@ export default function BillingPage() {
     qc.invalidateQueries({ queryKey: ['tables'] })
   }
 
-  const billRequestedTables = tables.filter((t) => t.status === 'bill_requested')
-  const occupiedTables = tables.filter((t) => t.status === 'occupied')
-
-  const activeItems = order?.items.filter((i) => !i.is_voided) ?? []
-  const subtotal = activeItems.reduce((s, i) => s + i.unit_price * i.quantity, 0)
-  const discountAmt = parseFloat(discountInput) || 0
-  const serviceChargeAmt = serviceChargeEnabled ? Math.round(subtotal * 0.1) : 0
-  const gstTotal = bill ? bill.cgst_amount + bill.sgst_amount + bill.igst_amount : Math.round(subtotal * 0.05)
-  const grandTotal = bill
-    ? bill.grand_total
-    : subtotal + gstTotal + serviceChargeAmt - discountAmt
-
   return (
     <div className="min-h-screen">
       {splitOpen && <SplitBillModal total={grandTotal} onClose={() => setSplitOpen(false)} />}
@@ -216,7 +218,7 @@ export default function BillingPage() {
             <div className="flex gap-3 pt-1">
               <button onClick={() => { setVoidTarget(null); setVoidReason('') }} className="flex-1 py-2.5 rounded-xl border border-outline-variant/40 text-on-surface-variant text-sm font-medium hover:bg-surface-container-low">Cancel</button>
               <button
-                onClick={() => voidMutation.mutate()}
+                onClick={() => voidMutation.mutate({ orderId: order!.id, itemId: voidTarget!.itemId, reason: voidReason })}
                 disabled={!voidReason.trim() || voidMutation.isPending}
                 className="flex-1 py-2.5 rounded-xl bg-error text-white text-sm font-bold disabled:opacity-40"
               >
