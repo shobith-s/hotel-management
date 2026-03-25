@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 import uuid
 
-from sqlalchemy import Enum as SAEnum, ForeignKey, String
+from sqlalchemy import Enum as SAEnum, Float, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +31,8 @@ class Table(Base):
     table_number: Mapped[str] = mapped_column(String(20), unique=True)
     capacity: Mapped[int] = mapped_column(default=4)
     status: Mapped[TableStatus] = mapped_column(SAEnum(TableStatus), default=TableStatus.available)
+    pos_x: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    pos_y: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     section: Mapped[TableSection] = relationship("TableSection", back_populates="tables")
     orders: Mapped[List[Order]] = relationship("Order", back_populates="table")

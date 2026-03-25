@@ -36,6 +36,8 @@ class TableUpdate(BaseModel):
     table_number: Optional[str] = None
     capacity: Optional[int] = None
     status: Optional[TableStatus] = None
+    pos_x: Optional[float] = None
+    pos_y: Optional[float] = None
 
 
 class TableRead(BaseModel):
@@ -46,6 +48,8 @@ class TableRead(BaseModel):
     table_number: str
     capacity: int
     status: TableStatus
+    pos_x: Optional[float] = None
+    pos_y: Optional[float] = None
 
 
 class TableWithSection(TableRead):
