@@ -12,7 +12,7 @@ from app.core.database import get_db
 from app.core.security import require_roles
 from app.models.audit import OrderAuditLog
 from app.models.enums import AuditAction, UserRole
-from app.models.order import OrderItem
+from app.models.order import Order, OrderItem
 
 router = APIRouter(prefix="/audit", tags=["Audit"])
 
@@ -41,7 +41,7 @@ def list_audit_logs(
     q = (
         db.query(OrderAuditLog)
         .options(
-            joinedload(OrderAuditLog.order).joinedload("table"),
+            joinedload(OrderAuditLog.order).joinedload(Order.table),
             joinedload(OrderAuditLog.performed_by_user),
         )
     )
