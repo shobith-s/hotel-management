@@ -20,6 +20,10 @@ class PaymentRequest(BaseModel):
     payment_mode: PaymentMode
 
 
+class ChargeToRoomRequest(BaseModel):
+    booking_id: uuid.UUID
+
+
 class BillRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

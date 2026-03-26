@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user, require_roles
 from app.models.enums import UserRole
-from app.schemas.billing import BillCreate, BillRead, PaymentRequest
+from app.schemas.billing import BillCreate, BillRead, ChargeToRoomRequest, PaymentRequest
 from app.services import billing as billing_svc
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -38,3 +38,8 @@ def get_bill(bill_id: uuid.UUID, db: Session = Depends(get_db)):
 @router.post("/{bill_id}/pay", response_model=BillRead, dependencies=[_all_staff])
 def settle_payment(bill_id: uuid.UUID, data: PaymentRequest, db: Session = Depends(get_db)):
     return billing_svc.settle_payment(db, bill_id, data)
+
+
+@router.post("/{bill_id}/charge-to-room", response_model=BillRead, dependencies=[_all_staff])
+def charge_to_room(bill_id: uuid.UUID, data: ChargeToRoomRequest, db: Session = Depends(get_db)):
+    return billing_svc.charge_to_room(db, bill_id, data.booking_id)

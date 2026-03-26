@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import { fetchTables, type Table } from '../api/tables'
 import { getActiveOrderForTable, voidItem, type OrderRead } from '../api/orders'
-import { createBill, getBillByOrder, settlePayment, type BillRead, type PaymentMode } from '../api/billing'
+import { createBill, getBillByOrder, settlePayment, chargeToRoom, type BillRead, type PaymentMode } from '../api/billing'
+import { listActiveBookings, type Booking } from '../api/lodge'
 import { openPrintPage } from '../api/client'
 
 function shareOnWhatsApp(bill: BillRead, tableNumber: string, items: { name: string; qty: number; total: number }[]) {
@@ -26,6 +27,83 @@ function shareOnWhatsApp(bill: BillRead, tableNumber: string, items: { name: str
 }
 
 type PaymentOption = { mode: PaymentMode; icon: string; label: string; sub: string }
+
+// ── Charge to Room modal ───────────────────────────────────────────────────────
+
+function ChargeToRoomModal({
+  onConfirm,
+  onClose,
+  isPending,
+}: {
+  onConfirm: (bookingId: string) => void
+  onClose: () => void
+  isPending: boolean
+}) {
+  const [selected, setSelected] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+
+  const { data: bookings = [], isLoading } = useQuery<Booking[]>({
+    queryKey: ['active-bookings'],
+    queryFn: listActiveBookings,
+  })
+
+  const filtered = bookings.filter(b =>
+    b.room.room_number.toLowerCase().includes(search.toLowerCase()) ||
+    b.guest.name.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/20">
+          <h3 className="font-headline text-lg font-bold text-primary">Charge to Room</h3>
+          <button onClick={onClose} className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">close</button>
+        </div>
+        <div className="p-6 flex flex-col gap-4">
+          <input
+            className="input"
+            placeholder="Search by room number or guest name…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            autoFocus
+          />
+          {isLoading ? (
+            <p className="text-sm text-on-surface-variant text-center animate-pulse py-4">Loading active bookings…</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-on-surface-variant text-center py-4">No active bookings found.</p>
+          ) : (
+            <div className="max-h-60 overflow-y-auto flex flex-col gap-2">
+              {filtered.map(b => (
+                <button
+                  key={b.id}
+                  onClick={() => setSelected(b.id)}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-colors ${
+                    selected === b.id ? 'border-primary bg-primary/5' : 'border-outline-variant/20 hover:border-outline-variant/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-primary text-sm">{b.guest.name}</p>
+                      <p className="text-xs text-on-surface-variant">Room {b.room.room_number}</p>
+                    </div>
+                    {selected === b.id && <span className="material-symbols-outlined text-primary text-lg">check_circle</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => selected && onConfirm(selected)}
+            disabled={!selected || isPending}
+            className="btn-primary py-3 disabled:opacity-40"
+          >
+            {isPending ? 'Charging…' : 'Post to Room Account'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function SplitBillModal({ total, onClose }: { total: number; onClose: () => void }) {
   const [splits, setSplits] = useState(2)
@@ -102,6 +180,7 @@ export default function BillingPage() {
   const [bill, setBill] = useState<BillRead | null>(null)
   const [settled, setSettled] = useState(false)
   const [splitOpen, setSplitOpen] = useState(false)
+  const [chargeToRoomOpen, setChargeToRoomOpen] = useState(false)
 
   // Void item
   const [voidTarget, setVoidTarget] = useState<{ itemId: string; itemName: string } | null>(null)
@@ -166,6 +245,17 @@ export default function BillingPage() {
     mutationFn: () => settlePayment(bill!.id, paymentMode),
     onSuccess: () => {
       setSettled(true)
+      qc.invalidateQueries({ queryKey: ['tables'] })
+      qc.invalidateQueries({ queryKey: ['orders'] })
+    },
+  })
+
+  const chargeToRoomMutation = useMutation({
+    mutationFn: (bookingId: string) => chargeToRoom(bill!.id, bookingId),
+    onSuccess: (updated) => {
+      setBill(updated)
+      setSettled(true)
+      setChargeToRoomOpen(false)
       qc.invalidateQueries({ queryKey: ['tables'] })
       qc.invalidateQueries({ queryKey: ['orders'] })
     },
@@ -581,14 +671,23 @@ export default function BillingPage() {
                     </button>
                   )}
                   {bill && bill.payment_status === 'pending' && (
-                    <button
-                      onClick={() => settleMutation.mutate()}
-                      disabled={settleMutation.isPending}
-                      className="w-full btn-primary py-4 flex items-center justify-center gap-2 disabled:opacity-40"
-                    >
-                      <span className="material-symbols-outlined text-xl">check_circle</span>
-                      {settleMutation.isPending ? 'Processing…' : 'Settle Payment'}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => settleMutation.mutate()}
+                        disabled={settleMutation.isPending}
+                        className="w-full btn-primary py-4 flex items-center justify-center gap-2 disabled:opacity-40"
+                      >
+                        <span className="material-symbols-outlined text-xl">check_circle</span>
+                        {settleMutation.isPending ? 'Processing…' : 'Settle Payment'}
+                      </button>
+                      <button
+                        onClick={() => setChargeToRoomOpen(true)}
+                        className="w-full py-3 flex items-center justify-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-xl">hotel</span>
+                        Charge to Room
+                      </button>
+                    </>
                   )}
                   {bill && (
                     <button
@@ -633,6 +732,14 @@ export default function BillingPage() {
           </div>
         )}
       </main>
+
+      {chargeToRoomOpen && bill && (
+        <ChargeToRoomModal
+          onConfirm={(bookingId) => chargeToRoomMutation.mutate(bookingId)}
+          onClose={() => setChargeToRoomOpen(false)}
+          isPending={chargeToRoomMutation.isPending}
+        />
+      )}
     </div>
   )
 }
