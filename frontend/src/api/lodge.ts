@@ -36,6 +36,8 @@ export interface BookingCharge {
   created_at: string
 }
 
+export type PaymentMode = 'cash' | 'card' | 'upi' | 'complimentary'
+
 export interface Booking {
   id: string
   room_id: string
@@ -49,6 +51,7 @@ export interface Booking {
   ac_used: boolean
   nightly_rate: number
   status: 'active' | 'checked_out' | 'cancelled'
+  payment_mode: PaymentMode | null
   created_at: string
   guest: Guest
   room: Room
@@ -65,6 +68,7 @@ export interface CheckoutSummary {
   gst_amount: number
   other_charges: number
   grand_total: number
+  payment_mode: PaymentMode
 }
 
 export interface GuestCreate {
@@ -118,7 +122,9 @@ export async function listActiveBookings(): Promise<Booking[]> {
   return res.data
 }
 
-export async function checkOut(bookingId: string): Promise<CheckoutSummary> {
-  const res = await api.post<CheckoutSummary>(`/lodge/bookings/${bookingId}/checkout`, {})
+export async function checkOut(bookingId: string, paymentMode: PaymentMode): Promise<CheckoutSummary> {
+  const res = await api.post<CheckoutSummary>(`/lodge/bookings/${bookingId}/checkout`, {
+    payment_mode: paymentMode,
+  })
   return res.data
 }

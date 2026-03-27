@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
-from .enums import BookingStatus, ChargeType, HousekeepingStatus, IDType, RoomStatus
+from .enums import BookingStatus, ChargeType, HousekeepingStatus, IDType, PaymentMode, RoomStatus
 
 if TYPE_CHECKING:
     from .user import User
@@ -70,6 +70,7 @@ class Booking(Base):
     ac_used: Mapped[bool] = mapped_column(Boolean, default=True)
     nightly_rate: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     status: Mapped[BookingStatus] = mapped_column(SAEnum(BookingStatus), default=BookingStatus.active)
+    payment_mode: Mapped[Optional[PaymentMode]] = mapped_column(SAEnum(PaymentMode), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     room: Mapped[Room] = relationship("Room", back_populates="bookings")

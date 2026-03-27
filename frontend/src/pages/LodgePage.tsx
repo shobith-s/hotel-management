@@ -5,7 +5,7 @@ import TopBar from '../components/shared/TopBar'
 import {
   fetchRooms, fetchRoomTypes, updateRoom, createGuest, createBooking,
   listActiveBookings, checkOut,
-  type Room, type Booking, type CheckoutSummary, type GuestCreate,
+  type Room, type Booking, type CheckoutSummary, type GuestCreate, type PaymentMode,
 } from '../api/lodge'
 
 // ── Housekeeping cycle ────────────────────────────────────────────────────────
@@ -409,9 +409,10 @@ function BookingPanel({
 }) {
   const qc = useQueryClient()
   const [error, setError] = useState('')
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash')
 
   const checkOutMutation = useMutation({
-    mutationFn: () => checkOut(booking.id),
+    mutationFn: () => checkOut(booking.id, paymentMode),
     onSuccess: (summary) => {
       qc.invalidateQueries({ queryKey: ['rooms'] })
       qc.invalidateQueries({ queryKey: ['bookings'] })
@@ -493,6 +494,26 @@ function BookingPanel({
         </div>
       </div>
 
+      {/* Payment mode */}
+      <div className="bg-surface-container rounded-2xl p-5 border border-outline-variant/10">
+        <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-3">Payment Method</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(['cash', 'card', 'upi', 'complimentary'] as PaymentMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setPaymentMode(mode)}
+              className={`py-2 rounded-xl border text-sm font-medium capitalize transition-colors ${
+                paymentMode === mode
+                  ? 'bg-primary text-on-primary border-primary'
+                  : 'border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary'
+              }`}
+            >
+              {mode === 'upi' ? 'UPI' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error && <p className="text-xs text-error">{error}</p>}
 
       <button
@@ -545,6 +566,12 @@ function CheckoutReceipt({ summary, onDone }: { summary: CheckoutSummary; onDone
           <span className="font-bold text-primary">Grand Total</span>
           <span className="font-headline text-xl font-bold text-primary">
             ₹{summary.grand_total.toLocaleString('en-IN')}
+          </span>
+        </div>
+        <div className="flex justify-between text-sm pt-1">
+          <span className="text-on-surface-variant">Payment</span>
+          <span className="font-bold text-primary capitalize">
+            {summary.payment_mode === 'upi' ? 'UPI' : summary.payment_mode}
           </span>
         </div>
       </div>

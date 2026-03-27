@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.models.enums import BookingStatus, ChargeType, HousekeepingStatus, IDType, RoomStatus
+from app.models.enums import BookingStatus, ChargeType, HousekeepingStatus, IDType, PaymentMode, RoomStatus
 
 
 class RoomTypeCreate(BaseModel):
@@ -100,6 +100,7 @@ class BookingCreate(BaseModel):
 
 class CheckOutRequest(BaseModel):
     check_out_at: Optional[datetime] = None     # defaults to now() in service layer
+    payment_mode: PaymentMode = PaymentMode.cash
 
 
 class BookingChargeCreate(BaseModel):
@@ -136,6 +137,7 @@ class BookingRead(BaseModel):
     ac_used: bool
     nightly_rate: float
     status: BookingStatus
+    payment_mode: Optional[PaymentMode]
     created_at: datetime
     guest: GuestRead
     room: RoomRead
@@ -154,3 +156,4 @@ class CheckoutResponse(BaseModel):
     gst_amount: float
     other_charges: float
     grand_total: float
+    payment_mode: PaymentMode

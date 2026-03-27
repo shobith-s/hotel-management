@@ -203,6 +203,7 @@ def check_out(db: Session, booking_id: uuid.UUID, data: CheckOutRequest) -> dict
 
     booking.check_out_at = check_out_at
     booking.status = BookingStatus.checked_out
+    booking.payment_mode = data.payment_mode
     booking.room.status = RoomStatus.available
     booking.room.housekeeping = HousekeepingStatus.dirty   # triggers housekeeping workflow
 
@@ -218,4 +219,5 @@ def check_out(db: Session, booking_id: uuid.UUID, data: CheckOutRequest) -> dict
         "gst_amount": float(gst_amount),
         "other_charges": float(total_charges - room_charge),
         "grand_total": float(grand_total),
+        "payment_mode": data.payment_mode,
     }

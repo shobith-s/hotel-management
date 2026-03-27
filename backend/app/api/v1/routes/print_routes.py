@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user_from_query
 from app.models.billing import Bill
 from app.models.enums import BookingStatus, UserRole
-from app.models.lodge import Booking
+from app.models.lodge import Booking, Room
 from app.models.order import Order, OrderItem
 from app.api.v1.routes.settings import load_settings
 
@@ -344,7 +344,7 @@ def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
         db.query(Booking)
         .options(
             joinedload(Booking.guest),
-            joinedload(Booking.room).joinedload("room_type"),
+            joinedload(Booking.room).joinedload(Room.room_type),
             joinedload(Booking.charges),
         )
         .filter(Booking.id == booking_id)
@@ -412,6 +412,7 @@ def _render_lodge(booking_id: uuid.UUID, token: str, db: Session):
   <div class="meta-row"><span class="label">Check-in</span><span>{_fmt_dt(booking.check_in_at)}</span></div>
   <div class="meta-row"><span class="label">Check-out</span><span>{_fmt_dt(booking.check_out_at)}</span></div>
   <div class="meta-row"><span class="label">Nights</span><span>{nights}</span></div>
+  <div class="meta-row"><span class="label">Payment</span><span class="bold">{(booking.payment_mode.value if booking.payment_mode else "Cash").upper()}</span></div>
 
   <hr class="divider">
 
