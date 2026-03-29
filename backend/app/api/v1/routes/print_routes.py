@@ -326,6 +326,85 @@ def _render_bill(bill_id: uuid.UUID, token: str, db: Session):
     return HTMLResponse(content=html)
 
 
+# ── Lodge Check-In Receipt ─────────────────────────────────────────────────────
+
+@router.get("/lodge-checkin/{booking_id}", response_class=HTMLResponse)
+def print_checkin_receipt(booking_id: uuid.UUID, token: str = Query(...), db: Session = Depends(get_db)):
+    user = get_current_user_from_query(token, db)
+    if user.role not in (UserRole.admin, UserRole.manager, UserRole.receptionist):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    s = load_settings()
+
+    booking: Booking | None = (
+        db.query(Booking)
+        .options(
+            joinedload(Booking.guest),
+            joinedload(Booking.room).joinedload(Room.room_type),
+        )
+        .filter(Booking.id == booking_id)
+        .first()
+    )
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    guest = booking.guest
+    room  = booking.room
+    rt    = room.room_type
+    advance = float(booking.advance_paid)
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check-In Receipt — {guest.name}</title>
+  <style>{_PRINT_CSS}</style>
+</head>
+<body>
+  <div class="center">
+    {_hotel_header(s)}
+  </div>
+
+  <hr class="divider">
+
+  <div class="center" style="font-size:12px;font-weight:bold;letter-spacing:2px;">CHECK-IN RECEIPT</div>
+
+  <hr class="divider">
+
+  <div class="meta-row"><span class="label">Date</span><span>{_fmt_dt(booking.check_in_at)}</span></div>
+
+  <hr class="divider">
+
+  <div class="meta-row"><span class="label">Guest</span><span class="bold">{guest.name}</span></div>
+  <div class="meta-row"><span class="label">Phone</span><span>{guest.phone}</span></div>
+  <div class="meta-row"><span class="label">ID</span><span>{guest.id_type.value.upper()} {guest.id_number}</span></div>
+
+  <hr class="divider">
+
+  <div class="meta-row"><span class="label">Room</span><span class="bold">{room.room_number}</span></div>
+  <div class="meta-row"><span class="label">Room Type</span><span>{rt.name}</span></div>
+  <div class="meta-row"><span class="label">AC</span><span>{"Yes" if booking.ac_used else "No"}</span></div>
+  <div class="meta-row"><span class="label">Nightly Rate</span><span>₹{float(booking.nightly_rate):.0f}</span></div>
+  <div class="meta-row"><span class="label">Check-In</span><span>{_fmt_dt(booking.check_in_at)}</span></div>
+  <div class="meta-row"><span class="label">Expected Out</span><span>{_fmt_dt(booking.expected_check_out)}</span></div>
+
+  {"<hr class='divider'><div class='meta-row bold'><span>Advance Paid</span><span>₹" + f"{advance:.2f}</span></div>" if advance else ""}
+
+  <hr class="divider">
+
+  <div class="footer">
+    Thank you for choosing us!<br>
+    We hope you enjoy your stay.
+  </div>
+
+  {_PRINT_BUTTON}
+</body>
+</html>"""
+
+    return HTMLResponse(content=html)
+
+
 # ── Lodge Checkout Receipt ─────────────────────────────────────────────────────
 
 @router.get("/lodge/{booking_id}", response_class=HTMLResponse)

@@ -180,7 +180,7 @@ function CheckInPanel({
   setAcUsed: (v: boolean) => void
   acRate: number
   nonAcRate: number
-  onSuccess: () => void
+  onSuccess: (bookingId: string) => void
   onCancel: () => void
   onHkUpdate: (hk: string) => void
 }) {
@@ -212,10 +212,10 @@ function CheckInPanel({
         ac_used: acUsed,
       })
     },
-    onSuccess: () => {
+    onSuccess: (booking) => {
       qc.invalidateQueries({ queryKey: ['rooms'] })
       qc.invalidateQueries({ queryKey: ['bookings'] })
-      onSuccess()
+      onSuccess(booking.id)
     },
     onError: (err: any) => {
       setError(err?.response?.data?.detail ?? 'Check-in failed. Please try again.')
@@ -597,7 +597,7 @@ function CheckoutReceipt({ summary, onDone }: { summary: CheckoutSummary; onDone
 type PanelState =
   | { type: 'none' }
   | { type: 'checkin'; room: Room }
-  | { type: 'checkin_success'; roomNumber: string }
+  | { type: 'checkin_success'; roomNumber: string; bookingId: string }
   | { type: 'booking'; booking: Booking }
   | { type: 'checkout'; summary: CheckoutSummary }
 
@@ -787,7 +787,7 @@ export default function LodgePage() {
                 setAcUsed={setAcUsed}
                 acRate={acRate}
                 nonAcRate={nonAcRate}
-                onSuccess={() => setPanel({ type: 'checkin_success', roomNumber: panel.room.room_number })}
+                onSuccess={(bookingId) => setPanel({ type: 'checkin_success', roomNumber: panel.room.room_number, bookingId })}
                 onCancel={() => setPanel({ type: 'none' })}
                 onHkUpdate={(hk) => hkMutation.mutate({ roomId: panel.room.id, hk })}
               />
@@ -798,9 +798,18 @@ export default function LodgePage() {
                 <span className="material-symbols-outlined text-6xl text-emerald-500 block">check_circle</span>
                 <h3 className="font-headline text-2xl font-bold text-primary">Checked In!</h3>
                 <p className="text-on-surface-variant text-sm">Room {panel.roomNumber} is now occupied.</p>
-                <button onClick={() => setPanel({ type: 'none' })} className="btn-primary px-6 py-2.5">
-                  Done
-                </button>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => openPrintPage(`/print/lodge-checkin/${panel.bookingId}`)}
+                    className="py-2.5 px-5 flex items-center gap-2 border border-outline-variant/40 rounded-xl text-primary font-medium hover:bg-surface-container-low transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-xl">print</span>
+                    Print Receipt
+                  </button>
+                  <button onClick={() => setPanel({ type: 'none' })} className="btn-primary px-6 py-2.5">
+                    Done
+                  </button>
+                </div>
               </div>
             )}
 
