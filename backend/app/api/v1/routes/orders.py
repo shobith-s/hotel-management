@@ -1,7 +1,8 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from app.core.ws_manager import kds_manager
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -47,8 +48,15 @@ def list_orders(
 
 
 @router.post("/", response_model=OrderRead)
-def create_order(data: OrderCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    return order_svc.create_order(db, data, current_user.id)
+def create_order(
+    data: OrderCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    order = order_svc.create_order(db, data, current_user.id)
+    background_tasks.add_task(kds_manager.broadcast, {"type": "new_order", "order_id": str(order.id)})
+    return order
 
 
 @router.get("/table/{table_id}/active", response_model=OrderRead)
@@ -71,10 +79,13 @@ def get_order(order_id: uuid.UUID, db: Session = Depends(get_db), _=_all_staff):
 def add_items(
     order_id: uuid.UUID,
     data: AddItemsRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    return order_svc.add_items(db, order_id, data, current_user.id)
+    order = order_svc.add_items(db, order_id, data, current_user.id)
+    background_tasks.add_task(kds_manager.broadcast, {"type": "order_updated", "order_id": str(order_id)})
+    return order
 
 
 @router.patch("/{order_id}/items/{item_id}/served", response_model=OrderItemRead)

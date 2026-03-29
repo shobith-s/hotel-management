@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import { listOrders, markItemServed, type OrderRead } from '../api/orders'
 import { fetchTables, type Table } from '../api/tables'
+import { useKdsWebSocket } from '../hooks/useKdsWebSocket'
 
 type LocalStatus = 'new' | 'in_prep' | 'ready'
 
@@ -146,11 +147,12 @@ function OrderCard({
 export default function KDSPage() {
   const qc = useQueryClient()
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
+  const { isConnected } = useKdsWebSocket()
 
   const { data: orders = [], isLoading, dataUpdatedAt } = useQuery<OrderRead[]>({
     queryKey: ['orders', 'open', 'unserved'],
     queryFn: () => listOrders('open', true),
-    refetchInterval: 5000,
+    refetchInterval: isConnected ? 30000 : 5000,  // fast poll only when WS is down
   })
 
   const { data: tables = [] } = useQuery<Table[]>({
@@ -199,7 +201,7 @@ export default function KDSPage() {
               Kitchen Display
             </h2>
             <p className="text-on-surface-variant mt-2">
-              {visibleOrders.length} active order{visibleOrders.length !== 1 ? 's' : ''} · auto-refreshes every 5s
+              {visibleOrders.length} active order{visibleOrders.length !== 1 ? 's' : ''} · {isConnected ? 'live via WebSocket' : 'polling every 5s'}
             </p>
           </div>
           <div className="flex gap-4 items-center">
@@ -207,9 +209,9 @@ export default function KDSPage() {
               <span className="material-symbols-outlined text-lg">update</span>
               <span className="font-bold text-sm">{lastUpdated}</span>
             </div>
-            <div className="bg-primary text-white px-6 py-3 rounded-full flex items-center gap-2 shadow-lg">
-              <span className="material-symbols-outlined text-lg">sync</span>
-              <span className="font-bold">Live</span>
+            <div className={`px-6 py-3 rounded-full flex items-center gap-2 shadow-lg ${isConnected ? 'bg-primary text-white' : 'bg-surface-container text-on-surface-variant'}`}>
+              <span className="material-symbols-outlined text-lg">{isConnected ? 'wifi' : 'wifi_off'}</span>
+              <span className="font-bold">{isConnected ? 'Live' : 'Polling'}</span>
             </div>
           </div>
         </div>

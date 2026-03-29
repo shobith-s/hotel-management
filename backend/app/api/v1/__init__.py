@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.routes import audit, auth, billing, lodge, menu, orders, print_routes, reports, settings, tables, users
+from app.api.v1.routes import audit, auth, billing, lodge, menu, orders, print_routes, reports, settings, tables, users, ws
 
 router = APIRouter(prefix="/api/v1")
 
@@ -15,3 +15,4 @@ router.include_router(print_routes.router)
 router.include_router(reports.router)
 router.include_router(settings.router)
 router.include_router(audit.router)
+router.include_router(ws.router)
