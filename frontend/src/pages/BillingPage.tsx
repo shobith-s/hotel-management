@@ -247,6 +247,7 @@ export default function BillingPage() {
       setSettled(true)
       qc.invalidateQueries({ queryKey: ['tables'] })
       qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['order-for-table', selectedTable?.id] })
     },
   })
 
@@ -258,6 +259,7 @@ export default function BillingPage() {
       setChargeToRoomOpen(false)
       qc.invalidateQueries({ queryKey: ['tables'] })
       qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['order-for-table', selectedTable?.id] })
     },
   })
 

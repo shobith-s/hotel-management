@@ -112,6 +112,16 @@ def get_bill_by_order(db: Session, order_id: uuid.UUID) -> Bill:
     return bill
 
 
+def _release_merge_group(db: Session, table: Table) -> None:
+    """Clear merge_group_id from all tables in the group and mark them available."""
+    if table.merge_group_id is None:
+        return
+    siblings = db.query(Table).filter(Table.merge_group_id == table.merge_group_id).all()
+    for t in siblings:
+        t.merge_group_id = None
+        t.status = TableStatus.available
+
+
 def charge_to_room(db: Session, bill_id: uuid.UUID, booking_id: uuid.UUID) -> Bill:
     bill = get_bill(db, bill_id)
     if bill.payment_status == PaymentStatus.paid:
@@ -140,6 +150,7 @@ def charge_to_room(db: Session, bill_id: uuid.UUID, booking_id: uuid.UUID) -> Bi
 
     table = db.get(Table, order.table_id)
     table.status = TableStatus.available
+    _release_merge_group(db, table)
 
     db.commit()
     db.refresh(bill)
@@ -160,6 +171,7 @@ def settle_payment(db: Session, bill_id: uuid.UUID, data: PaymentRequest) -> Bil
 
     table = db.get(Table, order.table_id)
     table.status = TableStatus.available
+    _release_merge_group(db, table)
 
     db.commit()
     db.refresh(bill)
