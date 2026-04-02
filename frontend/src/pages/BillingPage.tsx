@@ -270,6 +270,8 @@ export default function BillingPage() {
     setSplitOpen(false)
     setDiscountInput('')
     setServiceChargeEnabled(false)
+    setVoidTarget(null)
+    setVoidReason('')
   }
 
   function reset() {
@@ -278,6 +280,8 @@ export default function BillingPage() {
     setSettled(false)
     setDiscountInput('')
     setServiceChargeEnabled(false)
+    setVoidTarget(null)
+    setVoidReason('')
     qc.invalidateQueries({ queryKey: ['tables'] })
   }
 

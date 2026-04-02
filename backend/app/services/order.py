@@ -108,11 +108,25 @@ def get_order(db: Session, order_id: uuid.UUID) -> Order:
 
 
 def get_active_order_for_table(db: Session, table_id: uuid.UUID) -> Optional[Order]:
-    return (
+    order = (
         db.query(Order)
         .filter(Order.table_id == table_id, Order.status == OrderStatus.open)
         .first()
     )
+    if order:
+        return order
+    # If the table is part of a merge group, find the order on any sibling
+    table = db.get(Table, table_id)
+    if table and table.merge_group_id:
+        sibling_ids = [
+            t.id for t in db.query(Table).filter(Table.merge_group_id == table.merge_group_id).all()
+        ]
+        order = (
+            db.query(Order)
+            .filter(Order.table_id.in_(sibling_ids), Order.status == OrderStatus.open)
+            .first()
+        )
+    return order
 
 
 def add_items(db: Session, order_id: uuid.UUID, data: AddItemsRequest, waiter_id: uuid.UUID) -> Order:
