@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_roles
 from app.models.enums import TableStatus, UserRole
 from app.schemas.table import (
-    TableCreate, TableRead, TableSectionCreate, TableSectionRead,
+    MergeRequest, TableCreate, TableRead, TableSectionCreate, TableSectionRead,
     TableSectionWithTables, TableUpdate, TableWithSection,
 )
 from app.services import table as table_svc
@@ -63,3 +63,15 @@ def get_table(table_id: uuid.UUID, db: Session = Depends(get_db), _=Depends(get_
 @router.patch("/{table_id}", response_model=TableRead, dependencies=[_admin_manager])
 def update_table(table_id: uuid.UUID, data: TableUpdate, db: Session = Depends(get_db)):
     return table_svc.update_table(db, table_id, data)
+
+
+# ── Merge / Unmerge ───────────────────────────────────────────────────────────
+
+@router.post("/merge", response_model=List[TableRead], dependencies=[_admin_manager])
+def merge_tables(data: MergeRequest, db: Session = Depends(get_db)):
+    return table_svc.merge_tables(db, data.table_ids)
+
+
+@router.post("/unmerge/{merge_group_id}", response_model=List[TableRead], dependencies=[_admin_manager])
+def unmerge_tables(merge_group_id: uuid.UUID, db: Session = Depends(get_db)):
+    return table_svc.unmerge_tables(db, merge_group_id)

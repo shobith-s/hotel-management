@@ -70,3 +70,53 @@ def update_table(db: Session, table_id: uuid.UUID, data: TableUpdate) -> Table:
     db.commit()
     db.refresh(table)
     return table
+
+
+# ── Table Merging ─────────────────────────────────────────────────────────────
+
+def merge_tables(db: Session, table_ids: List[uuid.UUID]) -> List[Table]:
+    if len(table_ids) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 tables required to merge")
+
+    tables = [get_table(db, tid) for tid in table_ids]
+
+    for table in tables:
+        if table.status not in (TableStatus.available, TableStatus.reserved):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Table {table.table_number} is {table.status.value} and cannot be merged",
+            )
+
+    group_id = uuid.uuid4()
+    for table in tables:
+        table.merge_group_id = group_id
+        table.status = TableStatus.occupied
+
+    db.commit()
+    for table in tables:
+        db.refresh(table)
+    return tables
+
+
+def unmerge_tables(db: Session, merge_group_id: uuid.UUID) -> List[Table]:
+    tables = db.query(Table).filter(Table.merge_group_id == merge_group_id).all()
+    if not tables:
+        raise HTTPException(status_code=404, detail="Merge group not found")
+
+    for table in tables:
+        table.merge_group_id = None
+        # Only reset status if the table has no active orders
+        if table.status == TableStatus.occupied:
+            from app.models.order import Order
+            from app.models.enums import OrderStatus
+            active = db.query(Order).filter(
+                Order.table_id == table.id,
+                Order.status == OrderStatus.open,
+            ).first()
+            if not active:
+                table.status = TableStatus.available
+
+    db.commit()
+    for table in tables:
+        db.refresh(table)
+    return tables

@@ -33,6 +33,7 @@ class Table(Base):
     status: Mapped[TableStatus] = mapped_column(SAEnum(TableStatus), default=TableStatus.available)
     pos_x: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     pos_y: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    merge_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(PGUUID(as_uuid=True), nullable=True)
 
     section: Mapped[TableSection] = relationship("TableSection", back_populates="tables")
     orders: Mapped[List[Order]] = relationship("Order", back_populates="table")

@@ -8,6 +8,10 @@ from pydantic import BaseModel, ConfigDict
 from app.models.enums import TableStatus
 
 
+class MergeRequest(BaseModel):
+    table_ids: list[uuid.UUID]
+
+
 class TableSectionCreate(BaseModel):
     name: str
 
@@ -50,6 +54,7 @@ class TableRead(BaseModel):
     status: TableStatus
     pos_x: Optional[float] = None
     pos_y: Optional[float] = None
+    merge_group_id: Optional[uuid.UUID] = None
 
 
 class TableWithSection(TableRead):

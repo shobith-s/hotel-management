@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
-import { fetchTables, updateTable, Table } from '../api/tables'
+import { fetchTables, updateTable, mergeTables, unmergeTables, Table } from '../api/tables'
 import { fetchRooms } from '../api/lodge'
 import { useAuth } from '../context/AuthContext'
 
@@ -38,37 +38,67 @@ function TableTile({
   table,
   pos,
   editMode,
+  mergeMode,
+  selected,
   onPointerDown,
+  onMergeClick,
+  onUnmerge,
 }: {
   table: Table
   pos: { x: number; y: number }
   editMode: boolean
+  mergeMode: boolean
+  selected: boolean
   onPointerDown: (e: React.PointerEvent) => void
+  onMergeClick: () => void
+  onUnmerge: () => void
 }) {
   const s = STATUS_CFG[table.status] ?? STATUS_CFG.available
+  const isMerged = !!table.merge_group_id
 
   return (
     <div
-      className={`absolute border-2 rounded-xl select-none ${s.bg} ${
-        editMode
-          ? 'cursor-grab active:cursor-grabbing shadow-lg ring-2 ring-primary/20'
-          : 'cursor-default shadow-sm'
+      className={`absolute border-2 rounded-xl select-none transition-all ${
+        mergeMode
+          ? selected
+            ? 'bg-primary border-primary cursor-pointer shadow-lg ring-2 ring-primary/40'
+            : 'cursor-pointer shadow-sm opacity-80 hover:opacity-100 ' + s.bg
+          : s.bg + (editMode ? ' cursor-grab active:cursor-grabbing shadow-lg ring-2 ring-primary/20' : ' cursor-default shadow-sm')
       }`}
       style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: 88, height: 72, touchAction: 'none' }}
       onPointerDown={editMode ? onPointerDown : undefined}
+      onClick={mergeMode ? onMergeClick : undefined}
     >
       <div className="h-full flex flex-col items-center justify-center gap-1 px-2">
-        <span className={`font-headline font-bold text-lg leading-none ${s.text}`}>
+        <span className={`font-headline font-bold text-lg leading-none ${mergeMode && selected ? 'text-on-primary' : s.text}`}>
           {table.table_number}
         </span>
         <div className="flex items-center gap-1">
-          <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-          <span className={`text-[10px] font-bold uppercase tracking-wide leading-none ${s.text} opacity-80`}>
-            {s.label}
-          </span>
+          {isMerged && !mergeMode ? (
+            <>
+              <span className="material-symbols-outlined text-[11px] text-primary opacity-70">link</span>
+              <span className={`text-[10px] font-bold uppercase tracking-wide leading-none ${s.text} opacity-80`}>Merged</span>
+            </>
+          ) : (
+            <>
+              <span className={`w-1.5 h-1.5 rounded-full ${mergeMode && selected ? 'bg-on-primary' : s.dot}`} />
+              <span className={`text-[10px] font-bold uppercase tracking-wide leading-none ${mergeMode && selected ? 'text-on-primary' : s.text} opacity-80`}>
+                {s.label}
+              </span>
+            </>
+          )}
         </div>
         {editMode && (
           <span className="material-symbols-outlined text-[11px] opacity-25 mt-0.5">drag_pan</span>
+        )}
+        {isMerged && !mergeMode && !editMode && (
+          <button
+            className="absolute -top-2 -right-2 bg-error text-white rounded-full w-5 h-5 flex items-center justify-center shadow text-[10px] hover:bg-error/80"
+            onClick={(e) => { e.stopPropagation(); onUnmerge() }}
+            title="Unmerge"
+          >
+            <span className="material-symbols-outlined text-[12px]">link_off</span>
+          </button>
         )}
       </div>
     </div>
@@ -87,6 +117,23 @@ export default function DashboardPage() {
   const [overrides, setOverrides] = useState<Record<string, { x: number; y: number }>>({})
   const overridesRef = useRef(overrides)
   overridesRef.current = overrides
+
+  const [mergeMode, setMergeMode] = useState(false)
+  const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set())
+
+  const mergeMutation = useMutation({
+    mutationFn: (ids: string[]) => mergeTables(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] })
+      setMergeMode(false)
+      setSelectedForMerge(new Set())
+    },
+  })
+
+  const unmergeMutation = useMutation({
+    mutationFn: (groupId: string) => unmergeTables(groupId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tables'] }),
+  })
 
   const dragging = useRef<{ id: string; offsetXPx: number; offsetYPx: number } | null>(null)
 
@@ -219,14 +266,41 @@ export default function DashboardPage() {
                     {saveMutation.isPending ? 'Saving…' : 'Save Layout'}
                   </button>
                 </div>
+              ) : mergeMode ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-on-surface-variant">{selectedForMerge.size} selected</span>
+                  <button
+                    onClick={() => { setMergeMode(false); setSelectedForMerge(new Set()) }}
+                    className="btn-secondary px-4 py-2 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => mergeMutation.mutate(Array.from(selectedForMerge))}
+                    disabled={selectedForMerge.size < 2 || mergeMutation.isPending}
+                    className="btn-primary px-4 py-2 text-sm flex items-center gap-1.5 disabled:opacity-40"
+                  >
+                    <span className="material-symbols-outlined text-base">link</span>
+                    {mergeMutation.isPending ? 'Merging…' : 'Confirm Merge'}
+                  </button>
+                </div>
               ) : (
-                <button
-                  onClick={() => setEditMode(true)}
-                  className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-primary transition-colors px-3 py-2 rounded-lg hover:bg-surface-container-high"
-                >
-                  <span className="material-symbols-outlined text-base">edit</span>
-                  Edit Layout
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setMergeMode(true)}
+                    className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-primary transition-colors px-3 py-2 rounded-lg hover:bg-surface-container-high"
+                  >
+                    <span className="material-symbols-outlined text-base">link</span>
+                    Merge Tables
+                  </button>
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-primary transition-colors px-3 py-2 rounded-lg hover:bg-surface-container-high"
+                  >
+                    <span className="material-symbols-outlined text-base">edit</span>
+                    Edit Layout
+                  </button>
+                </div>
               )
             )}
           </div>
@@ -242,6 +316,8 @@ export default function DashboardPage() {
               className={`flex-1 min-h-0 relative rounded-2xl border-2 transition-colors ${
                 editMode
                   ? 'bg-surface-container-low/60 border-primary/30 border-dashed'
+                  : mergeMode
+                  ? 'bg-surface-container-low/60 border-primary/40 border-dashed'
                   : 'bg-surface-container-low/30 border-outline-variant/20'
               }`}
               style={{ minHeight: 280 }}
@@ -262,7 +338,17 @@ export default function DashboardPage() {
                   table={table}
                   pos={getPos(table, idx, overrides)}
                   editMode={editMode}
+                  mergeMode={mergeMode}
+                  selected={selectedForMerge.has(table.id)}
                   onPointerDown={e => handlePointerDown(e, table.id)}
+                  onMergeClick={() => {
+                    setSelectedForMerge(prev => {
+                      const next = new Set(prev)
+                      next.has(table.id) ? next.delete(table.id) : next.add(table.id)
+                      return next
+                    })
+                  }}
+                  onUnmerge={() => table.merge_group_id && unmergeMutation.mutate(table.merge_group_id)}
                 />
               ))}
 
