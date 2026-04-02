@@ -249,6 +249,9 @@ def occupancy_report(
         for b in bookings:
             ci = b.check_in_at.date()
             co = b.check_out_at.date() if b.check_out_at else (end + timedelta(days=1))
+            # Same-day checkout counts as 1 occupied night on check-in date
+            if co <= ci:
+                co = ci + timedelta(days=1)
             if ci <= day < co:
                 count += 1
         pct = round(count / total_rooms * 100, 1) if total_rooms else 0.0
@@ -294,6 +297,8 @@ def occupancy_report(
             for b in rt_bookings:
                 ci = b.check_in_at.date()
                 co = b.check_out_at.date() if b.check_out_at else (end + timedelta(days=1))
+                if co <= ci:
+                    co = ci + timedelta(days=1)
                 if ci <= day < co:
                     occ_nights += 1
 
