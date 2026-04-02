@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, List, Optional
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +42,7 @@ class MenuItem(Base):
     category: Mapped[MenuCategory] = relationship("MenuCategory", back_populates="items")
     variants: Mapped[List[MenuItemVariant]] = relationship("MenuItemVariant", back_populates="menu_item", cascade="all, delete-orphan")
     order_items: Mapped[List[OrderItem]] = relationship("OrderItem", back_populates="menu_item")
+    history: Mapped[List[MenuItemHistory]] = relationship("MenuItemHistory", back_populates="menu_item", cascade="all, delete-orphan", order_by="MenuItemHistory.changed_at.desc()")
 
 
 class MenuItemVariant(Base):
@@ -55,3 +56,19 @@ class MenuItemVariant(Base):
 
     menu_item: Mapped[MenuItem] = relationship("MenuItem", back_populates="variants")
     order_items: Mapped[List[OrderItem]] = relationship("OrderItem", back_populates="variant")
+
+
+class MenuItemHistory(Base):
+    __tablename__ = "menu_item_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    menu_item_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("menu_items.id", ondelete="CASCADE"))
+    changed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    field_name: Mapped[str] = mapped_column(String(50))   # e.g. "price", "is_available", "name"
+    old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # e.g. "Variant: Half"
+
+    menu_item: Mapped[MenuItem] = relationship("MenuItem", back_populates="history")
+    changed_by: Mapped[Optional[object]] = relationship("User", foreign_keys=[changed_by_id])

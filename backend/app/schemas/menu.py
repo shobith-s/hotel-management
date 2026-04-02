@@ -84,6 +84,21 @@ class MenuItemRead(BaseModel):
     updated_at: datetime
 
 
+# ── Menu Item History ─────────────────────────────────────────────────────────
+
+class MenuItemHistoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    menu_item_id: uuid.UUID
+    changed_by_id: Optional[uuid.UUID]
+    changed_at: datetime
+    field_name: str
+    old_value: Optional[str]
+    new_value: Optional[str]
+    note: Optional[str]
+
+
 # ── Menu Categories ───────────────────────────────────────────────────────────
 
 class MenuCategoryCreate(BaseModel):

@@ -12,7 +12,7 @@ from app.core.security import get_current_user, require_roles
 from app.models.enums import UserRole
 from app.schemas.menu import (
     MenuCategoryCreate, MenuCategoryRead, MenuCategoryUpdate, MenuCategoryWithItems,
-    MenuItemCreate, MenuItemRead, MenuItemUpdate,
+    MenuItemCreate, MenuItemHistoryRead, MenuItemRead, MenuItemUpdate,
     MenuItemVariantCreate, MenuItemVariantRead, MenuItemVariantUpdate,
 )
 from app.services import menu as menu_svc
@@ -84,14 +84,19 @@ def get_item(item_id: uuid.UUID, db: Session = Depends(get_db), _=Depends(get_cu
     return menu_svc.get_menu_item(db, item_id)
 
 
-@router.patch("/items/{item_id}", response_model=MenuItemRead, dependencies=[_admin_manager])
-def update_item(item_id: uuid.UUID, data: MenuItemUpdate, db: Session = Depends(get_db)):
-    return menu_svc.update_menu_item(db, item_id, data)
+@router.patch("/items/{item_id}", response_model=MenuItemRead)
+def update_item(item_id: uuid.UUID, data: MenuItemUpdate, db: Session = Depends(get_db), current_user=Depends(require_roles(UserRole.admin, UserRole.manager))):
+    return menu_svc.update_menu_item(db, item_id, data, changed_by_id=current_user.id)
 
 
-@router.post("/items/{item_id}/toggle", response_model=MenuItemRead, dependencies=[_admin_manager])
-def toggle_availability(item_id: uuid.UUID, db: Session = Depends(get_db)):
-    return menu_svc.toggle_availability(db, item_id)
+@router.post("/items/{item_id}/toggle", response_model=MenuItemRead)
+def toggle_availability(item_id: uuid.UUID, db: Session = Depends(get_db), current_user=Depends(require_roles(UserRole.admin, UserRole.manager))):
+    return menu_svc.toggle_availability(db, item_id, changed_by_id=current_user.id)
+
+
+@router.get("/items/{item_id}/history", response_model=List[MenuItemHistoryRead])
+def get_item_history(item_id: uuid.UUID, db: Session = Depends(get_db), _=Depends(require_roles(UserRole.admin, UserRole.manager))):
+    return menu_svc.get_item_history(db, item_id)
 
 
 # ── Variants ──────────────────────────────────────────────────────────────────
@@ -101,9 +106,9 @@ def add_variant(item_id: uuid.UUID, data: MenuItemVariantCreate, db: Session = D
     return menu_svc.add_variant(db, item_id, data)
 
 
-@router.patch("/variants/{variant_id}", response_model=MenuItemVariantRead, dependencies=[_admin_manager])
-def update_variant(variant_id: uuid.UUID, data: MenuItemVariantUpdate, db: Session = Depends(get_db)):
-    return menu_svc.update_variant(db, variant_id, data)
+@router.patch("/variants/{variant_id}", response_model=MenuItemVariantRead)
+def update_variant(variant_id: uuid.UUID, data: MenuItemVariantUpdate, db: Session = Depends(get_db), current_user=Depends(require_roles(UserRole.admin, UserRole.manager))):
+    return menu_svc.update_variant(db, variant_id, data, changed_by_id=current_user.id)
 
 
 @router.delete("/variants/{variant_id}", status_code=204, dependencies=[_admin_manager])

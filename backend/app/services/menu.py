@@ -6,12 +6,31 @@ from typing import List, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.menu import MenuCategory, MenuItem, MenuItemVariant
+from app.models.menu import MenuCategory, MenuItem, MenuItemHistory, MenuItemVariant
 from app.schemas.menu import (
     MenuCategoryCreate, MenuCategoryUpdate,
     MenuItemCreate, MenuItemUpdate,
     MenuItemVariantCreate, MenuItemVariantUpdate,
 )
+
+
+def _record_history(
+    db: Session,
+    item_id: uuid.UUID,
+    changed_by_id: Optional[uuid.UUID],
+    changes: dict,
+    note: Optional[str] = None,
+) -> None:
+    """Record one history row per changed field."""
+    for field, (old_val, new_val) in changes.items():
+        db.add(MenuItemHistory(
+            menu_item_id=item_id,
+            changed_by_id=changed_by_id,
+            field_name=field,
+            old_value=str(old_val) if old_val is not None else None,
+            new_value=str(new_val) if new_val is not None else None,
+            note=note,
+        ))
 
 
 # ── Categories ────────────────────────────────────────────────────────────────
@@ -85,18 +104,24 @@ def list_menu_items(
     return q.all()
 
 
-def update_menu_item(db: Session, item_id: uuid.UUID, data: MenuItemUpdate) -> MenuItem:
+def update_menu_item(db: Session, item_id: uuid.UUID, data: MenuItemUpdate, changed_by_id: Optional[uuid.UUID] = None) -> MenuItem:
     item = get_menu_item(db, item_id)
-    for field, value in data.model_dump(exclude_none=True).items():
+    updates = data.model_dump(exclude_none=True)
+    changes = {f: (getattr(item, f), v) for f, v in updates.items() if getattr(item, f) != v}
+    for field, value in updates.items():
         setattr(item, field, value)
+    if changes:
+        _record_history(db, item_id, changed_by_id, changes)
     db.commit()
     db.refresh(item)
     return item
 
 
-def toggle_availability(db: Session, item_id: uuid.UUID) -> MenuItem:
+def toggle_availability(db: Session, item_id: uuid.UUID, changed_by_id: Optional[uuid.UUID] = None) -> MenuItem:
     item = get_menu_item(db, item_id)
+    old_val = item.is_available
     item.is_available = not item.is_available
+    _record_history(db, item_id, changed_by_id, {"is_available": (old_val, item.is_available)})
     db.commit()
     db.refresh(item)
     return item
@@ -113,15 +138,30 @@ def add_variant(db: Session, item_id: uuid.UUID, data: MenuItemVariantCreate) ->
     return variant
 
 
-def update_variant(db: Session, variant_id: uuid.UUID, data: MenuItemVariantUpdate) -> MenuItemVariant:
+def update_variant(db: Session, variant_id: uuid.UUID, data: MenuItemVariantUpdate, changed_by_id: Optional[uuid.UUID] = None) -> MenuItemVariant:
     variant = db.get(MenuItemVariant, variant_id)
     if not variant:
         raise HTTPException(status_code=404, detail="Variant not found")
-    for field, value in data.model_dump(exclude_none=True).items():
+    updates = data.model_dump(exclude_none=True)
+    changes = {f: (getattr(variant, f), v) for f, v in updates.items() if getattr(variant, f) != v}
+    for field, value in updates.items():
         setattr(variant, field, value)
+    if changes:
+        _record_history(db, variant.menu_item_id, changed_by_id, changes, note=f"Variant: {variant.label}")
     db.commit()
     db.refresh(variant)
     return variant
+
+
+def get_item_history(db: Session, item_id: uuid.UUID) -> list:
+    get_menu_item(db, item_id)
+    return (
+        db.query(MenuItemHistory)
+        .filter(MenuItemHistory.menu_item_id == item_id)
+        .order_by(MenuItemHistory.changed_at.desc())
+        .limit(100)
+        .all()
+    )
 
 
 def delete_variant(db: Session, variant_id: uuid.UUID) -> None:

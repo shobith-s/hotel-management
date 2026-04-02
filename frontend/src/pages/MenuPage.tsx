@@ -1,8 +1,86 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
-import { fetchFullMenu, MenuCategory } from '../api/menu'
+import { fetchFullMenu, getMenuItemHistory, MenuCategory, MenuItem, MenuItemHistoryEntry } from '../api/menu'
 import api from '../api/client'
+
+const FIELD_LABELS: Record<string, string> = {
+  is_available: 'Availability',
+  price: 'Price',
+  name: 'Name',
+  gst_rate: 'GST Rate',
+  is_veg: 'Veg/Non-Veg',
+  description: 'Description',
+  is_market_price: 'Market Price',
+  category_id: 'Category',
+  label: 'Variant Label',
+  is_default: 'Default Variant',
+}
+
+function formatValue(field: string, val: string | null): string {
+  if (val === null) return '—'
+  if (field === 'is_available') return val === 'True' ? 'Available' : 'Unavailable'
+  if (field === 'is_veg') return val === 'True' ? 'Veg' : 'Non-Veg'
+  if (field === 'is_market_price') return val === 'True' ? 'Yes' : 'No'
+  if (field === 'is_default') return val === 'True' ? 'Yes' : 'No'
+  if (field === 'price') return `₹${parseFloat(val).toFixed(2)}`
+  if (field === 'gst_rate') return `${val}%`
+  return val
+}
+
+function HistoryPanel({ item, onClose }: { item: MenuItem; onClose: () => void }) {
+  const { data: history = [], isLoading } = useQuery<MenuItemHistoryEntry[]>({
+    queryKey: ['menu-history', item.id],
+    queryFn: () => getMenuItemHistory(item.id),
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-surface shadow-2xl flex flex-col h-full">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/20">
+          <div>
+            <h2 className="font-headline text-lg font-bold text-primary">Change History</h2>
+            <p className="text-xs text-on-surface-variant mt-0.5">{item.name}</p>
+          </div>
+          <button onClick={onClose} className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">close</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {isLoading && <p className="text-sm text-on-surface-variant animate-pulse">Loading history…</p>}
+          {!isLoading && history.length === 0 && (
+            <div className="text-center py-16 text-on-surface-variant">
+              <span className="material-symbols-outlined text-4xl block mb-2 opacity-40">history</span>
+              <p className="text-sm">No changes recorded yet.</p>
+              <p className="text-xs mt-1 opacity-60">Changes made from now on will appear here.</p>
+            </div>
+          )}
+          {history.length > 0 && (
+            <ol className="relative border-l border-outline-variant/30 ml-2 space-y-5">
+              {history.map((entry) => (
+                <li key={entry.id} className="ml-5">
+                  <span className="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-primary/20 border-2 border-primary/50" />
+                  <p className="text-xs text-on-surface-variant mb-1">
+                    {new Date(entry.changed_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                    {entry.note && <span className="ml-2 text-primary/60">· {entry.note}</span>}
+                  </p>
+                  <p className="text-sm font-semibold text-primary">
+                    {FIELD_LABELS[entry.field_name] ?? entry.field_name}
+                  </p>
+                  <p className="text-sm text-on-surface-variant">
+                    <span className="line-through opacity-60">{formatValue(entry.field_name, entry.old_value)}</span>
+                    <span className="material-symbols-outlined text-xs mx-1 align-middle">arrow_forward</span>
+                    <span className="font-medium text-primary">{formatValue(entry.field_name, entry.new_value)}</span>
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function toggleItem(itemId: string) {
   return api.post(`/menu/items/${itemId}/toggle`)
@@ -24,6 +102,7 @@ export default function MenuPage() {
   const [activeCatId, setActiveCatId] = useState<string | null>(null)
   const [vegFilter, setVegFilter] = useState<'all' | 'veg' | 'nonveg'>('all')
   const [csvResult, setCsvResult] = useState<CsvImportResult | null>(null)
+  const [historyItem, setHistoryItem] = useState<MenuItem | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: menu = [], isLoading } = useQuery<MenuCategory[]>({
@@ -203,14 +282,23 @@ export default function MenuPage() {
                       </span>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <button
-                        onClick={() => toggleMutation.mutate(item.id)}
-                        disabled={toggleMutation.isPending}
-                        title={item.is_available ? 'Mark unavailable' : 'Mark available'}
-                        className="material-symbols-outlined text-primary/40 hover:text-primary transition-colors disabled:opacity-30"
-                      >
-                        {item.is_available ? 'toggle_on' : 'toggle_off'}
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setHistoryItem(item)}
+                          title="View change history"
+                          className="material-symbols-outlined text-on-surface-variant/40 hover:text-primary transition-colors text-[20px]"
+                        >
+                          history
+                        </button>
+                        <button
+                          onClick={() => toggleMutation.mutate(item.id)}
+                          disabled={toggleMutation.isPending}
+                          title={item.is_available ? 'Mark unavailable' : 'Mark available'}
+                          className="material-symbols-outlined text-primary/40 hover:text-primary transition-colors disabled:opacity-30"
+                        >
+                          {item.is_available ? 'toggle_on' : 'toggle_off'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -226,6 +314,7 @@ export default function MenuPage() {
           </div>
         </div>
       </main>
+      {historyItem && <HistoryPanel item={historyItem} onClose={() => setHistoryItem(null)} />}
     </div>
   )
 }
