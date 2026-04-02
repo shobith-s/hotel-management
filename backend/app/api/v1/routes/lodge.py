@@ -1,11 +1,12 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_roles
+from app.core.ws_manager import hk_manager
 from app.models.enums import HousekeepingStatus, RoomStatus, UserRole
 from app.schemas.lodge import (
     BookingChargeCreate, BookingChargeRead, BookingCreate, BookingRead,
@@ -62,8 +63,16 @@ def get_room(room_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.patch("/rooms/{room_id}", response_model=RoomRead, dependencies=[_admin_manager])
-def update_room(room_id: uuid.UUID, data: RoomUpdate, db: Session = Depends(get_db)):
-    return lodge_svc.update_room(db, room_id, data)
+def update_room(room_id: uuid.UUID, data: RoomUpdate, bg: BackgroundTasks, db: Session = Depends(get_db)):
+    room = lodge_svc.update_room(db, room_id, data)
+    if data.housekeeping is not None:
+        bg.add_task(hk_manager.broadcast, {
+            "type": "housekeeping_update",
+            "room_id": str(room.id),
+            "room_number": room.room_number,
+            "housekeeping": data.housekeeping.value,
+        })
+    return room
 
 
 # ── Guests ────────────────────────────────────────────────────────────────────
@@ -113,6 +122,14 @@ def add_charge(booking_id: uuid.UUID, data: BookingChargeCreate, db: Session = D
 def check_out(
     booking_id: uuid.UUID,
     data: CheckOutRequest,
+    bg: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    return lodge_svc.check_out(db, booking_id, data)
+    result = lodge_svc.check_out(db, booking_id, data)
+    booking = result["booking"]
+    bg.add_task(hk_manager.broadcast, {
+        "type": "room_dirty",
+        "room_id": str(booking.room_id),
+        "room_number": booking.room.room_number,
+    })
+    return result

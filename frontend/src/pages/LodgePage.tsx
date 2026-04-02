@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { openPrintPage } from '../api/client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
+import { useHousekeepingWebSocket } from '../hooks/useHousekeepingWebSocket'
 import {
   fetchRooms, fetchRoomTypes, updateRoom, createGuest, createBooking,
   listActiveBookings, checkOut,
@@ -605,6 +606,7 @@ export default function LodgePage() {
   const qc = useQueryClient()
   const [acUsed, setAcUsed] = useState(true)
   const [panel, setPanel] = useState<PanelState>({ type: 'none' })
+  const { notifications, dismissNotification } = useHousekeepingWebSocket()
 
   const { data: rooms = [], isLoading } = useQuery<Room[]>({
     queryKey: ['rooms'],
@@ -656,6 +658,39 @@ export default function LodgePage() {
   return (
     <div className="min-h-screen">
       <TopBar title="Lodge Management" />
+
+      {/* Housekeeping notifications */}
+      {notifications.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm ${
+                n.type === 'room_dirty'
+                  ? 'bg-amber-50 border-amber-300 text-amber-900'
+                  : n.housekeeping === 'clean'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                  : n.housekeeping === 'in_progress'
+                  ? 'bg-rose-50 border-rose-300 text-rose-900'
+                  : 'bg-amber-50 border-amber-300 text-amber-900'
+              }`}
+            >
+              <span className="material-symbols-outlined text-base mt-0.5">cleaning_services</span>
+              <div className="flex-1">
+                <p className="font-semibold">Room {n.room_number}</p>
+                <p className="text-xs opacity-80">
+                  {n.type === 'room_dirty'
+                    ? 'Checked out — needs cleaning'
+                    : `Status: ${n.housekeeping ?? 'updated'}`}
+                </p>
+              </div>
+              <button onClick={() => dismissNotification(n.id)} className="opacity-60 hover:opacity-100">
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="pt-6 px-10 pb-16 flex gap-10">
         {/* Left: Room grid */}

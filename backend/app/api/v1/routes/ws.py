@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.core.ws_manager import kds_manager
+from app.core.ws_manager import hk_manager, kds_manager
 
 router = APIRouter(tags=["WebSocket"])
 
@@ -14,3 +14,13 @@ async def kds_websocket(websocket: WebSocket) -> None:
             await websocket.receive_text()
     except WebSocketDisconnect:
         kds_manager.disconnect(websocket)
+
+
+@router.websocket("/ws/housekeeping")
+async def housekeeping_websocket(websocket: WebSocket) -> None:
+    await hk_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        hk_manager.disconnect(websocket)

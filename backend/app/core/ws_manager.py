@@ -27,3 +27,4 @@ class ConnectionManager:
 
 
 kds_manager = ConnectionManager()
+hk_manager = ConnectionManager()
