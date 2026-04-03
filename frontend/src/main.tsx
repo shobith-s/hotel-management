@@ -18,6 +18,7 @@ import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import AuditLogPage from './pages/AuditLogPage'
+import HousekeepingPage from './pages/HousekeepingPage'
 import ErrorBoundary from './components/shared/ErrorBoundary'
 
 const queryClient = new QueryClient()
@@ -49,6 +50,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/audit" element={<AuditLogPage />} />
+              <Route path="/housekeeping" element={<HousekeepingPage />} />
             </Route>
           </Route>
 

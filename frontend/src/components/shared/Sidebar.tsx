@@ -10,7 +10,8 @@ const ALL_NAV_ITEMS = [
   { to: '/lodge',     icon: 'bed',                label: 'Lodge' },
   { to: '/users',     icon: 'group',              label: 'Users' },
   { to: '/reports',   icon: 'analytics',          label: 'Reports' },
-  { to: '/audit',     icon: 'manage_search',       label: 'Audit Log' },
+  { to: '/audit',        icon: 'manage_search',   label: 'Audit Log' },
+  { to: '/housekeeping', icon: 'cleaning_services', label: 'Housekeeping' },
 ]
 
 export default function Sidebar() {

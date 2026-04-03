@@ -6,6 +6,7 @@ class UserRole(str, enum.Enum):
     manager = "manager"
     waiter = "waiter"
     receptionist = "receptionist"
+    housekeeping = "housekeeping"
 
 
 class TableStatus(str, enum.Enum):

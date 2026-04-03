@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-export type UserRole = 'admin' | 'manager' | 'waiter' | 'receptionist'
+export type UserRole = 'admin' | 'manager' | 'waiter' | 'receptionist' | 'housekeeping'
 
 export interface AuthUser {
   id: string
@@ -26,8 +26,9 @@ export function useAuth() {
 
 // Pages each role can access — first entry is their home (redirect target)
 export const ROLE_ALLOWED_PATHS: Record<UserRole, string[]> = {
-  admin:        ['/dashboard', '/menu', '/orders', '/kds', '/billing', '/lodge', '/users', '/reports', '/settings', '/audit'],
-  manager:      ['/dashboard', '/menu', '/orders', '/kds', '/billing', '/lodge', '/users', '/reports', '/audit'],
+  admin:        ['/dashboard', '/menu', '/orders', '/kds', '/billing', '/lodge', '/users', '/reports', '/settings', '/audit', '/housekeeping'],
+  manager:      ['/dashboard', '/menu', '/orders', '/kds', '/billing', '/lodge', '/users', '/reports', '/audit', '/housekeeping'],
   waiter:       ['/dashboard', '/orders', '/kds'],
   receptionist: ['/dashboard', '/billing', '/lodge'],
+  housekeeping: ['/housekeeping'],
 }

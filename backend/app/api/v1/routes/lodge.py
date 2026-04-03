@@ -21,6 +21,7 @@ _all_staff = Depends(get_current_user)
 _admin_only = Depends(require_roles(UserRole.admin))
 _admin_manager = Depends(require_roles(UserRole.admin, UserRole.manager))
 _front_desk = Depends(require_roles(UserRole.admin, UserRole.manager, UserRole.receptionist))
+_room_hk    = Depends(require_roles(UserRole.admin, UserRole.manager, UserRole.housekeeping))
 
 
 # ── Room Types ────────────────────────────────────────────────────────────────
@@ -62,7 +63,7 @@ def get_room(room_id: uuid.UUID, db: Session = Depends(get_db)):
     return lodge_svc.get_room(db, room_id)
 
 
-@router.patch("/rooms/{room_id}", response_model=RoomRead, dependencies=[_admin_manager])
+@router.patch("/rooms/{room_id}", response_model=RoomRead, dependencies=[_room_hk])
 def update_room(room_id: uuid.UUID, data: RoomUpdate, bg: BackgroundTasks, db: Session = Depends(get_db)):
     room = lodge_svc.update_room(db, room_id, data)
     if data.housekeeping is not None:
