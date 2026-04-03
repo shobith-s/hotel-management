@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import {
@@ -6,59 +6,78 @@ import {
   getOccupancyReport, type OccupancyReport, type DailyOccupancy, type RoomTypeBreakdown,
 } from '../api/reports'
 
-// ── Date helpers (same pattern as LodgePage) ──────────────────────────────────
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 function toDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function DateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [yyyy, mm, dd] = value ? value.split('-') : ['', '', '']
-  const hiddenRef = useRef<HTMLInputElement>(null)
+function todayStr() { return toDateStr(new Date()) }
+function firstOfMonthStr() { const d = new Date(); d.setDate(1); return toDateStr(d) }
 
-  function handlePart(part: 'dd' | 'mm' | 'yyyy', raw: string) {
-    const n = raw.replace(/\D/g, '')
-    let newDd = dd, newMm = mm, newYyyy = yyyy
-    if (part === 'dd')   newDd   = n.slice(0, 2)
-    if (part === 'mm')   newMm   = n.slice(0, 2)
-    if (part === 'yyyy') newYyyy = n.slice(0, 4)
-    if (newYyyy.length === 4 && newMm.length <= 2 && newDd.length <= 2) {
-      onChange(`${newYyyy}-${newMm.padStart(2, '0')}-${newDd.padStart(2, '0')}`)
-    } else {
-      onChange(`${newYyyy}-${newMm}-${newDd}`)
-    }
-  }
+// ── CSV export ────────────────────────────────────────────────────────────────
 
-  return (
-    <div className="flex items-center gap-0.5 border border-outline-variant/30 rounded-lg px-2 py-1.5 bg-surface-container-low focus-within:border-primary transition-colors">
-      <input type="text" inputMode="numeric" placeholder="DD"
-        value={dd} onChange={e => handlePart('dd', e.target.value)}
-        className="w-7 text-center bg-transparent focus:outline-none text-sm font-medium text-primary" />
-      <span className="text-on-surface-variant">/</span>
-      <input type="text" inputMode="numeric" placeholder="MM"
-        value={mm} onChange={e => handlePart('mm', e.target.value)}
-        className="w-7 text-center bg-transparent focus:outline-none text-sm font-medium text-primary" />
-      <span className="text-on-surface-variant">/</span>
-      <input type="text" inputMode="numeric" placeholder="YYYY"
-        value={yyyy} onChange={e => handlePart('yyyy', e.target.value)}
-        className="w-12 text-center bg-transparent focus:outline-none text-sm font-medium text-primary" />
-      <button
-        type="button"
-        onClick={() => hiddenRef.current?.showPicker?.()}
-        className="ml-1 text-on-surface-variant hover:text-primary transition-colors"
-      >
-        <span className="material-symbols-outlined text-base">calendar_month</span>
-      </button>
-      <input
-        ref={hiddenRef}
-        type="date"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-0 h-0 opacity-0 pointer-events-none absolute"
-        tabIndex={-1}
-      />
-    </div>
-  )
+function downloadCsv(filename: string, rows: (string | number)[][]) {
+  const csv = rows
+    .map((r) => r.map((v) => (typeof v === 'string' && v.includes(',') ? `"${v}"` : v)).join(','))
+    .join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportRevenueCsv(data: RevenueReport) {
+  const rows: (string | number)[][] = [
+    ['REVENUE REPORT', data.start_date, 'to', data.end_date],
+    [],
+    ['Metric', 'Value'],
+    ['Total Revenue', data.total_revenue],
+    ['Restaurant Revenue', data.restaurant_revenue],
+    ['Lodge Revenue', data.lodge_revenue],
+    ['Restaurant GST', data.restaurant_gst],
+    ['Total Bills', data.total_bills],
+    ['Avg Spend per Bill', data.avg_spend_per_bill],
+    ['Total Discounts', data.total_discount],
+    ['Voided Items Count', data.void_summary.count],
+    ['Voided Items Value', data.void_summary.value],
+    [],
+    ['PAYMENT MODE BREAKDOWN'],
+    ['Mode', 'Amount'],
+    ...Object.entries(data.payment_modes).map(([mode, amount]) => [mode, amount]),
+    [],
+    ['TOP SELLING ITEMS'],
+    ['Item', 'Qty Sold', 'Revenue'],
+    ...data.top_items.map((i) => [i.name, i.quantity_sold, i.revenue]),
+  ]
+  downloadCsv(`revenue-${data.start_date}-to-${data.end_date}.csv`, rows)
+}
+
+function exportOccupancyCsv(data: OccupancyReport) {
+  const rows: (string | number)[][] = [
+    ['OCCUPANCY REPORT', data.start_date, 'to', data.end_date],
+    [],
+    ['Metric', 'Value'],
+    ['Total Rooms', data.total_rooms],
+    ['Avg Occupancy %', data.avg_occupancy_pct],
+    ['Occupied Nights', data.occupied_nights],
+    ['Total Room Nights', data.total_room_nights],
+    ['RevPAR', data.revpar],
+    ['ADR', data.adr],
+    ['Room Revenue', data.total_revenue],
+    [],
+    ['DAILY OCCUPANCY'],
+    ['Date', 'Occupied Rooms', 'Occupancy %'],
+    ...data.daily.map((d) => [d.date, d.occupied_rooms, d.occupancy_pct]),
+    [],
+    ['ROOM TYPE BREAKDOWN'],
+    ['Room Type', 'Total Rooms', 'Occupied Nights', 'Revenue'],
+    ...data.by_room_type.map((rt) => [rt.room_type, rt.total_rooms, rt.occupied_nights, rt.revenue]),
+  ]
+  downloadCsv(`occupancy-${data.start_date}-to-${data.end_date}.csv`, rows)
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -114,10 +133,7 @@ function PaymentRow({ mode, amount, total }: { mode: string; amount: number; tot
       </span>
       <span className="capitalize text-sm font-medium text-primary w-28">{mode}</span>
       <div className="flex-1 bg-surface-container-low rounded-full h-2">
-        <div
-          className="bg-primary rounded-full h-2 transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="bg-primary rounded-full h-2 transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
       <span className="text-sm font-bold text-primary w-24 text-right">₹{amount.toLocaleString('en-IN')}</span>
     </div>
@@ -149,7 +165,6 @@ function OccupancyBar({ day }: { day: DailyOccupancy }) {
 function OccupancyTab({ data }: { data: OccupancyReport }) {
   return (
     <>
-      {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <StatCard
           icon="hotel"
@@ -158,27 +173,11 @@ function OccupancyTab({ data }: { data: OccupancyReport }) {
           sub={`${data.occupied_nights} of ${data.total_room_nights} room-nights`}
           color={data.avg_occupancy_pct >= 70 ? 'text-emerald-600' : 'text-primary'}
         />
-        <StatCard
-          icon="currency_rupee"
-          label="RevPAR"
-          value={`₹${data.revpar.toLocaleString('en-IN')}`}
-          sub="Revenue per available room"
-        />
-        <StatCard
-          icon="trending_up"
-          label="ADR"
-          value={`₹${data.adr.toLocaleString('en-IN')}`}
-          sub="Avg daily rate (occupied)"
-        />
-        <StatCard
-          icon="bed"
-          label="Room Revenue"
-          value={`₹${data.total_revenue.toLocaleString('en-IN')}`}
-          sub={`${data.total_rooms} total rooms`}
-        />
+        <StatCard icon="currency_rupee" label="RevPAR" value={`₹${data.revpar.toLocaleString('en-IN')}`} sub="Revenue per available room" />
+        <StatCard icon="trending_up" label="ADR" value={`₹${data.adr.toLocaleString('en-IN')}`} sub="Avg daily rate (occupied)" />
+        <StatCard icon="bed" label="Room Revenue" value={`₹${data.total_revenue.toLocaleString('en-IN')}`} sub={`${data.total_rooms} total rooms`} />
       </div>
 
-      {/* Daily bar chart */}
       <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card mb-8">
         <h2 className="font-headline text-lg font-bold text-primary mb-5">Daily Occupancy</h2>
         {data.daily.length === 0 ? (
@@ -188,7 +187,6 @@ function OccupancyTab({ data }: { data: OccupancyReport }) {
             {data.daily.map((d) => <OccupancyBar key={d.date} day={d} />)}
           </div>
         ) : (
-          /* For longer ranges show a compact table */
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -219,7 +217,6 @@ function OccupancyTab({ data }: { data: OccupancyReport }) {
         )}
       </div>
 
-      {/* Room type breakdown */}
       {data.by_room_type.length > 0 && (
         <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-card">
           <h2 className="font-headline text-lg font-bold text-primary mb-5">Room Type Breakdown</h2>
@@ -257,32 +254,103 @@ function OccupancyTab({ data }: { data: OccupancyReport }) {
   )
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Date range controls ───────────────────────────────────────────────────────
 
-function todayStr() { return toDateStr(new Date()) }
-function firstOfMonthStr() {
-  const d = new Date()
-  d.setDate(1)
-  return toDateStr(d)
+type Preset = { label: string; start: string; end: string }
+
+function getPresets(): Preset[] {
+  const today = new Date()
+  const todayS = toDateStr(today)
+
+  const weekStart = new Date(today)
+  weekStart.setDate(today.getDate() - today.getDay())
+
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+
+  const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+  const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
+
+  return [
+    { label: 'Today', start: todayS, end: todayS },
+    { label: 'This Week', start: toDateStr(weekStart), end: todayS },
+    { label: 'This Month', start: toDateStr(monthStart), end: todayS },
+    { label: 'Last Month', start: toDateStr(lastMonthStart), end: toDateStr(lastMonthEnd) },
+  ]
 }
 
+function DateRangeControls({
+  startDate, endDate, onStartChange, onEndChange,
+}: {
+  startDate: string; endDate: string
+  onStartChange: (v: string) => void; onEndChange: (v: string) => void
+}) {
+  const presets = getPresets()
+  const activePreset = presets.find((p) => p.start === startDate && p.end === endDate)?.label ?? null
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* Preset pills */}
+      <div className="flex gap-1.5">
+        {presets.map((p) => (
+          <button
+            key={p.label}
+            onClick={() => { onStartChange(p.start); onEndChange(p.end) }}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+              activePreset === p.label
+                ? 'bg-primary text-on-primary'
+                : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Date inputs */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-on-surface-variant font-medium">From</span>
+        <input
+          type="date"
+          value={startDate}
+          max={endDate || todayStr()}
+          onChange={(e) => onStartChange(e.target.value)}
+          className="bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-1.5 text-sm text-primary focus:outline-none focus:border-primary transition-colors"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-on-surface-variant font-medium">To</span>
+        <input
+          type="date"
+          value={endDate}
+          min={startDate}
+          max={todayStr()}
+          onChange={(e) => onEndChange(e.target.value)}
+          className="bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-1.5 text-sm text-primary focus:outline-none focus:border-primary transition-colors"
+        />
+      </div>
+    </div>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export default function ReportsPage() {
-  const [tab, setTab]           = useState<'revenue' | 'occupancy'>('revenue')
-  const [startDate, setStartDate] = useState(firstOfMonthStr())
-  const [endDate,   setEndDate]   = useState(todayStr())
+  const [tab, setTab]               = useState<'revenue' | 'occupancy'>('revenue')
+  const [startDate, setStartDate]   = useState(firstOfMonthStr())
+  const [endDate, setEndDate]       = useState(todayStr())
 
   const isValidRange = startDate.length === 10 && endDate.length === 10 && startDate <= endDate
 
   const { data: revenueData, isLoading: revLoading, isError: revError, error: revErr } = useQuery<RevenueReport>({
-    queryKey: ['reports', 'revenue', startDate, endDate],
-    queryFn:  () => getRevenueSummary(startDate, endDate),
-    enabled:  isValidRange && tab === 'revenue',
+    queryKey:  ['reports', 'revenue', startDate, endDate],
+    queryFn:   () => getRevenueSummary(startDate, endDate),
+    enabled:   isValidRange && tab === 'revenue',
   })
 
   const { data: occData, isLoading: occLoading, isError: occError, error: occErr } = useQuery<OccupancyReport>({
-    queryKey: ['reports', 'occupancy', startDate, endDate],
-    queryFn:  () => getOccupancyReport(startDate, endDate),
-    enabled:  isValidRange && tab === 'occupancy',
+    queryKey:  ['reports', 'occupancy', startDate, endDate],
+    queryFn:   () => getOccupancyReport(startDate, endDate),
+    enabled:   isValidRange && tab === 'occupancy',
   })
 
   const isLoading = tab === 'revenue' ? revLoading : occLoading
@@ -293,12 +361,21 @@ export default function ReportsPage() {
     ? Object.values(revenueData.payment_modes).reduce((s, v) => s + v, 0)
     : 0
 
+  const canExport = tab === 'revenue' ? !!revenueData : !!occData
+
+  function handleExport() {
+    if (tab === 'revenue' && revenueData) exportRevenueCsv(revenueData)
+    else if (tab === 'occupancy' && occData) exportOccupancyCsv(occData)
+  }
+
   return (
     <div className="min-h-screen">
       <TopBar title="Reports" />
       <div className="pt-6 px-10 pb-16">
-        {/* Tabs + Date range */}
+
+        {/* Toolbar */}
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+          {/* Tabs */}
           <div className="flex rounded-full overflow-hidden border border-outline-variant/20 text-sm w-fit">
             {([['revenue', 'Revenue'], ['occupancy', 'Occupancy']] as const).map(([key, label]) => (
               <button
@@ -312,21 +389,26 @@ export default function ReportsPage() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="material-symbols-outlined text-on-surface-variant text-base">date_range</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-on-surface-variant font-medium">From</span>
-              <DateInput value={startDate} onChange={setStartDate} />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-on-surface-variant font-medium">To</span>
-              <DateInput value={endDate} onChange={setEndDate} />
-            </div>
-            {!isValidRange && startDate.length === 10 && endDate.length === 10 && (
-              <p className="text-xs text-error">End date must be on or after start date</p>
-            )}
+            <DateRangeControls
+              startDate={startDate}
+              endDate={endDate}
+              onStartChange={setStartDate}
+              onEndChange={setEndDate}
+            />
+
             {isLoading && (
               <span className="text-xs text-on-surface-variant animate-pulse">Loading…</span>
             )}
+
+            {/* Export button */}
+            <button
+              onClick={handleExport}
+              disabled={!canExport}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-outline-variant/30 text-sm font-medium text-primary hover:bg-surface-container-low transition-colors disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <span className="material-symbols-outlined text-base">download</span>
+              Export CSV
+            </button>
           </div>
         </div>
 
@@ -379,7 +461,7 @@ export default function ReportsPage() {
         {/* Occupancy tab */}
         {tab === 'occupancy' && occData && <OccupancyTab data={occData} />}
 
-        {/* Empty states */}
+        {/* Empty / invalid states */}
         {!isLoading && !isError && isValidRange && ((tab === 'revenue' && !revenueData) || (tab === 'occupancy' && !occData)) && (
           <div className="text-center py-20 text-on-surface-variant">
             <span className="material-symbols-outlined text-5xl block opacity-30 mb-3">analytics</span>
