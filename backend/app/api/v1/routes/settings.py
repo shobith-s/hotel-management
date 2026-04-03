@@ -19,6 +19,8 @@ class HotelSettings(BaseModel):
     gstin: str = ""
     upi_id: str = ""
     logo_url: str = ""
+    service_charge_pct: float = 10.0
+    default_checkout_time: str = "12:00"
 
 
 def load_settings() -> HotelSettings:

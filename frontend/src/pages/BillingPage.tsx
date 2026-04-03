@@ -6,6 +6,7 @@ import { getActiveOrderForTable, voidItem, type OrderRead } from '../api/orders'
 import { createBill, getBillByOrder, settlePayment, chargeToRoom, splitBill, getSplits, settleSplit, type BillRead, type BillSplitRead, type PaymentMode } from '../api/billing'
 import { listActiveBookings, type Booking } from '../api/lodge'
 import { openPrintPage } from '../api/client'
+import { getSettings } from '../api/settings'
 
 function shareOnWhatsApp(bill: BillRead, tableNumber: string, items: { name: string; qty: number; total: number }[]) {
   const lines = [
@@ -281,6 +282,9 @@ export default function BillingPage() {
   const [discountInput, setDiscountInput] = useState<string>('')
   const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false)
 
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings, staleTime: 60_000 })
+  const serviceChargePct = (settings?.service_charge_pct ?? 10) / 100
+
   const { data: tables = [], isLoading: tablesLoading } = useQuery<Table[]>({
     queryKey: ['tables'],
     queryFn: fetchTables,
@@ -301,7 +305,7 @@ export default function BillingPage() {
   const activeItems = order?.items.filter((i) => !i.is_voided) ?? []
   const subtotal = activeItems.reduce((s, i) => s + i.unit_price * i.quantity, 0)
   const discountAmt = parseFloat(discountInput) || 0
-  const serviceChargeAmt = serviceChargeEnabled ? Math.round(subtotal * 0.1) : 0
+  const serviceChargeAmt = serviceChargeEnabled ? Math.round(subtotal * serviceChargePct) : 0
   const gstTotal = bill ? bill.cgst_amount + bill.sgst_amount + bill.igst_amount : Math.round(subtotal * 0.05)
   const grandTotal = bill
     ? bill.grand_total

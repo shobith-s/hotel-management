@@ -59,6 +59,12 @@ export default function SettingsPage() {
     setSaved(false)
   }
 
+  function handleNumber(key: keyof HotelSettings, value: string) {
+    const n = parseFloat(value)
+    setForm((prev) => prev ? { ...prev, [key]: isNaN(n) ? 0 : n } : prev)
+    setSaved(false)
+  }
+
   if (isLoading || !form) {
     return (
       <div className="flex-1 overflow-y-auto bg-surface">
@@ -125,6 +131,41 @@ export default function SettingsPage() {
             placeholder="https://example.com/logo.png"
             hint="Optional — hosted image URL for future use"
           />
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-card space-y-6 mt-6">
+          <h2 className="font-headline text-lg font-bold text-on-surface">Billing &amp; Operations</h2>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">
+                Service Charge (%)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={form.service_charge_pct}
+                onChange={(e) => handleNumber('service_charge_pct', e.target.value)}
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-sm text-primary focus:outline-none focus:border-primary transition-colors"
+              />
+              <p className="text-xs text-on-surface-variant mt-1">Applied to restaurant bills when enabled</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1.5">
+                Default Check-out Time
+              </label>
+              <input
+                type="time"
+                value={form.default_checkout_time}
+                onChange={(e) => handleChange('default_checkout_time', e.target.value)}
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-4 py-3 text-sm text-primary focus:outline-none focus:border-primary transition-colors"
+              />
+              <p className="text-xs text-on-surface-variant mt-1">Pre-filled on new check-in forms</p>
+            </div>
+          </div>
         </div>
 
         <div className="mt-8 flex items-center gap-4">

@@ -8,6 +8,7 @@ import {
   listActiveBookings, checkOut,
   type Room, type Booking, type CheckoutSummary, type GuestCreate, type PaymentMode,
 } from '../api/lodge'
+import { getSettings } from '../api/settings'
 
 // ── Housekeeping cycle ────────────────────────────────────────────────────────
 
@@ -172,6 +173,7 @@ function CheckInPanel({
   setAcUsed,
   acRate,
   nonAcRate,
+  defaultCheckoutTime,
   onSuccess,
   onCancel,
   onHkUpdate,
@@ -181,6 +183,7 @@ function CheckInPanel({
   setAcUsed: (v: boolean) => void
   acRate: number
   nonAcRate: number
+  defaultCheckoutTime: string
   onSuccess: (bookingId: string) => void
   onCancel: () => void
   onHkUpdate: (hk: string) => void
@@ -192,7 +195,7 @@ function CheckInPanel({
   const [checkInDate, setCheckInDate] = useState(todayDateStr())
   const [checkInTime, setCheckInTime] = useState(currentTimeStr())
   const [checkOutDate, setCheckOutDate] = useState(tomorrowDateStr())
-  const [checkOutTime, setCheckOutTime] = useState('12:00')
+  const [checkOutTime, setCheckOutTime] = useState(defaultCheckoutTime)
   const [numGuests, setNumGuests] = useState(1)
   const [advancePaid, setAdvancePaid] = useState(0)
   const [error, setError] = useState('')
@@ -488,9 +491,9 @@ function BookingPanel({
           </div>
         )}
         <div className="flex justify-between text-sm border-t border-outline-variant/15 pt-2 mt-2">
-          <span className="text-on-surface-variant">GST (12%)</span>
+          <span className="text-on-surface-variant">GST ({booking.room.room_type.gst_rate}%)</span>
           <span className="font-bold text-primary">
-            ₹{Math.round(booking.nightly_rate * nights * 0.12).toLocaleString('en-IN')}
+            ₹{Math.round(booking.nightly_rate * nights * (booking.room.room_type.gst_rate / 100)).toLocaleString('en-IN')}
           </span>
         </div>
       </div>
@@ -607,6 +610,8 @@ export default function LodgePage() {
   const [acUsed, setAcUsed] = useState(true)
   const [panel, setPanel] = useState<PanelState>({ type: 'none' })
   const { notifications, dismissNotification } = useHousekeepingWebSocket()
+
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: getSettings, staleTime: 60_000 })
 
   const { data: rooms = [], isLoading } = useQuery<Room[]>({
     queryKey: ['rooms'],
@@ -822,6 +827,7 @@ export default function LodgePage() {
                 setAcUsed={setAcUsed}
                 acRate={acRate}
                 nonAcRate={nonAcRate}
+                defaultCheckoutTime={settings?.default_checkout_time ?? '12:00'}
                 onSuccess={(bookingId) => setPanel({ type: 'checkin_success', roomNumber: panel.room.room_number, bookingId })}
                 onCancel={() => setPanel({ type: 'none' })}
                 onHkUpdate={(hk) => hkMutation.mutate({ roomId: panel.room.id, hk })}

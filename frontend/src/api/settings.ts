@@ -7,6 +7,8 @@ export interface HotelSettings {
   gstin: string
   upi_id: string
   logo_url: string
+  service_charge_pct: number
+  default_checkout_time: string
 }
 
 export async function getSettings(): Promise<HotelSettings> {
