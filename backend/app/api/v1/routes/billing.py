@@ -8,7 +8,7 @@ from app.core.security import get_current_user, require_roles
 from app.models.enums import UserRole
 from typing import List
 
-from app.schemas.billing import BillCreate, BillRead, BillSplitRead, ChargeToRoomRequest, PaymentRequest, SplitRequest
+from app.schemas.billing import BillCreate, BillRead, BillSplitRead, PaymentRequest, SplitRequest
 from app.services import billing as billing_svc
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -41,10 +41,6 @@ def get_bill(bill_id: uuid.UUID, db: Session = Depends(get_db)):
 def settle_payment(bill_id: uuid.UUID, data: PaymentRequest, db: Session = Depends(get_db)):
     return billing_svc.settle_payment(db, bill_id, data)
 
-
-@router.post("/{bill_id}/charge-to-room", response_model=BillRead, dependencies=[_all_staff])
-def charge_to_room(bill_id: uuid.UUID, data: ChargeToRoomRequest, db: Session = Depends(get_db)):
-    return billing_svc.charge_to_room(db, bill_id, data.booking_id)
 
 
 @router.post("/{bill_id}/split", response_model=List[BillSplitRead], dependencies=[_all_staff])

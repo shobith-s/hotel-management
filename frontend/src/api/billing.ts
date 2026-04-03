@@ -43,10 +43,6 @@ export async function settlePayment(billId: string, payment_mode: PaymentMode): 
   return res.data
 }
 
-export async function chargeToRoom(billId: string, bookingId: string): Promise<BillRead> {
-  const res = await api.post<BillRead>(`/billing/${billId}/charge-to-room`, { booking_id: bookingId })
-  return res.data
-}
 
 export interface BillSplitRead {
   id: string

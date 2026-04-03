@@ -20,9 +20,6 @@ class PaymentRequest(BaseModel):
     payment_mode: PaymentMode
 
 
-class ChargeToRoomRequest(BaseModel):
-    booking_id: uuid.UUID
-
 
 class SplitRequest(BaseModel):
     splits: int   # number of equal shares (2–20)

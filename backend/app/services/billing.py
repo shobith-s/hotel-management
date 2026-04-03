@@ -8,8 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.billing import Bill, BillSplit
-from app.models.enums import BookingStatus, ChargeType, OrderStatus, PaymentMode, PaymentStatus, TableStatus
-from app.models.lodge import Booking, BookingCharge
+from app.models.enums import OrderStatus, PaymentMode, PaymentStatus, TableStatus
 from app.models.order import Order, OrderItem
 from app.models.table import Table
 from app.schemas.billing import BillCreate, PaymentRequest
@@ -121,40 +120,6 @@ def _release_merge_group(db: Session, table: Table) -> None:
         t.merge_group_id = None
         t.status = TableStatus.available
 
-
-def charge_to_room(db: Session, bill_id: uuid.UUID, booking_id: uuid.UUID) -> Bill:
-    bill = get_bill(db, bill_id)
-    if bill.payment_status == PaymentStatus.paid:
-        raise HTTPException(400, "Bill is already settled")
-
-    booking = db.get(Booking, booking_id)
-    if not booking:
-        raise HTTPException(404, "Booking not found")
-    if booking.status != BookingStatus.active:
-        raise HTTPException(400, "Booking is not active")
-
-    db.add(BookingCharge(
-        booking_id=booking_id,
-        charge_type=ChargeType.restaurant,
-        description=f"Restaurant – {bill.bill_number}",
-        amount=float(bill.grand_total),
-        order_id=bill.order_id,
-    ))
-
-    bill.payment_mode = PaymentMode.credit
-    bill.payment_status = PaymentStatus.paid
-    bill.paid_at = datetime.utcnow()
-
-    order = db.get(Order, bill.order_id)
-    order.status = OrderStatus.paid
-
-    table = db.get(Table, order.table_id)
-    table.status = TableStatus.available
-    _release_merge_group(db, table)
-
-    db.commit()
-    db.refresh(bill)
-    return bill
 
 
 def settle_payment(db: Session, bill_id: uuid.UUID, data: PaymentRequest) -> Bill:
