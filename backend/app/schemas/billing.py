@@ -24,6 +24,22 @@ class ChargeToRoomRequest(BaseModel):
     booking_id: uuid.UUID
 
 
+class SplitRequest(BaseModel):
+    splits: int   # number of equal shares (2–20)
+
+
+class BillSplitRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    bill_id: uuid.UUID
+    split_number: int
+    amount: float
+    is_paid: bool
+    payment_mode: Optional[PaymentMode]
+    paid_at: Optional[datetime]
+
+
 class BillRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

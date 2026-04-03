@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user, require_roles
 from app.models.enums import UserRole
-from app.schemas.billing import BillCreate, BillRead, ChargeToRoomRequest, PaymentRequest
+from typing import List
+
+from app.schemas.billing import BillCreate, BillRead, BillSplitRead, ChargeToRoomRequest, PaymentRequest, SplitRequest
 from app.services import billing as billing_svc
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -43,3 +45,19 @@ def settle_payment(bill_id: uuid.UUID, data: PaymentRequest, db: Session = Depen
 @router.post("/{bill_id}/charge-to-room", response_model=BillRead, dependencies=[_all_staff])
 def charge_to_room(bill_id: uuid.UUID, data: ChargeToRoomRequest, db: Session = Depends(get_db)):
     return billing_svc.charge_to_room(db, bill_id, data.booking_id)
+
+
+@router.post("/{bill_id}/split", response_model=List[BillSplitRead], dependencies=[_all_staff])
+def split_bill(bill_id: uuid.UUID, data: SplitRequest, db: Session = Depends(get_db)):
+    return billing_svc.split_bill(db, bill_id, data.splits)
+
+
+@router.get("/{bill_id}/splits", response_model=List[BillSplitRead], dependencies=[_all_staff])
+def get_splits(bill_id: uuid.UUID, db: Session = Depends(get_db)):
+    bill = billing_svc.get_bill(db, bill_id)
+    return bill.splits
+
+
+@router.post("/splits/{split_id}/pay", response_model=BillSplitRead, dependencies=[_all_staff])
+def settle_split(split_id: uuid.UUID, data: PaymentRequest, db: Session = Depends(get_db)):
+    return billing_svc.settle_split(db, split_id, data.payment_mode)

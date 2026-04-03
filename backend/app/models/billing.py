@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Enum as SAEnum, ForeignKey, Numeric, String, func
+from sqlalchemy import Boolean, Enum as SAEnum, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,3 +37,18 @@ class Bill(Base):
 
     order: Mapped[Order] = relationship("Order", back_populates="bill")
     served_by_user: Mapped[User] = relationship("User", back_populates="bills")
+    splits: Mapped[List["BillSplit"]] = relationship("BillSplit", back_populates="bill", cascade="all, delete-orphan", order_by="BillSplit.split_number")
+
+
+class BillSplit(Base):
+    __tablename__ = "bill_splits"
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bill_id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("bills.id", ondelete="CASCADE"))
+    split_number: Mapped[int] = mapped_column(Integer)          # 1-based index (Guest 1, Guest 2, …)
+    amount: Mapped[float] = mapped_column(Numeric(10, 2))
+    is_paid: Mapped[bool] = mapped_column(Boolean, default=False)
+    payment_mode: Mapped[Optional[PaymentMode]] = mapped_column(SAEnum(PaymentMode), nullable=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
+    bill: Mapped[Bill] = relationship("Bill", back_populates="splits")

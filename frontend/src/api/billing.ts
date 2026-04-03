@@ -47,3 +47,28 @@ export async function chargeToRoom(billId: string, bookingId: string): Promise<B
   const res = await api.post<BillRead>(`/billing/${billId}/charge-to-room`, { booking_id: bookingId })
   return res.data
 }
+
+export interface BillSplitRead {
+  id: string
+  bill_id: string
+  split_number: number
+  amount: number
+  is_paid: boolean
+  payment_mode: PaymentMode | null
+  paid_at: string | null
+}
+
+export async function splitBill(billId: string, splits: number): Promise<BillSplitRead[]> {
+  const res = await api.post<BillSplitRead[]>(`/billing/${billId}/split`, { splits })
+  return res.data
+}
+
+export async function getSplits(billId: string): Promise<BillSplitRead[]> {
+  const res = await api.get<BillSplitRead[]>(`/billing/${billId}/splits`)
+  return res.data
+}
+
+export async function settleSplit(splitId: string, payment_mode: PaymentMode): Promise<BillSplitRead> {
+  const res = await api.post<BillSplitRead>(`/billing/splits/${splitId}/pay`, { payment_mode })
+  return res.data
+}

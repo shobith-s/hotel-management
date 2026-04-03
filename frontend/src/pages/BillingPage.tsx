@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../components/shared/TopBar'
 import { fetchTables, type Table } from '../api/tables'
 import { getActiveOrderForTable, voidItem, type OrderRead } from '../api/orders'
-import { createBill, getBillByOrder, settlePayment, chargeToRoom, type BillRead, type PaymentMode } from '../api/billing'
+import { createBill, getBillByOrder, settlePayment, chargeToRoom, splitBill, getSplits, settleSplit, type BillRead, type BillSplitRead, type PaymentMode } from '../api/billing'
 import { listActiveBookings, type Booking } from '../api/lodge'
 import { openPrintPage } from '../api/client'
 
@@ -105,10 +105,44 @@ function ChargeToRoomModal({
   )
 }
 
-function SplitBillModal({ total, onClose }: { total: number; onClose: () => void }) {
-  const [splits, setSplits] = useState(2)
-  const perPerson = splits > 0 ? total / splits : 0
-  const inputRef = useRef<HTMLInputElement>(null)
+function SplitBillModal({
+  billId,
+  total,
+  onClose,
+  onFullySettled,
+}: {
+  billId: string
+  total: number
+  onClose: () => void
+  onFullySettled: () => void
+}) {
+  const qc = useQueryClient()
+  const [guestCount, setGuestCount] = useState(2)
+  const [splitRows, setSplitRows] = useState<BillSplitRead[] | null>(null)
+  const [payModes, setPayModes] = useState<Record<string, PaymentMode>>({})
+
+  const confirmMutation = useMutation({
+    mutationFn: () => splitBill(billId, guestCount),
+    onSuccess: (rows) => setSplitRows(rows),
+  })
+
+  const payMutation = useMutation({
+    mutationFn: ({ splitId, mode }: { splitId: string; mode: PaymentMode }) =>
+      settleSplit(splitId, mode),
+    onSuccess: (updated) => {
+      setSplitRows((prev) =>
+        prev ? prev.map((r) => (r.id === updated.id ? updated : r)) : prev,
+      )
+      const updatedRows = splitRows?.map((r) => (r.id === updated.id ? updated : r))
+      if (updatedRows && updatedRows.every((r) => r.is_paid)) {
+        qc.invalidateQueries({ queryKey: ['tables'] })
+        qc.invalidateQueries({ queryKey: ['orders'] })
+        onFullySettled()
+      }
+    },
+  })
+
+  const perPerson = guestCount > 0 ? total / guestCount : 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -123,38 +157,95 @@ function SplitBillModal({ total, onClose }: { total: number; onClose: () => void
           <p className="font-headline text-3xl font-bold text-primary">₹{total.toFixed(2)}</p>
         </div>
 
-        <div className="mb-6">
-          <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-2">
-            Number of Guests
-          </label>
-          <div className="flex items-center gap-3">
+        {!splitRows ? (
+          <>
+            <div className="mb-6">
+              <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-2">
+                Number of Guests
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setGuestCount((n) => Math.max(2, n - 1))}
+                  className="w-10 h-10 rounded-full border border-outline-variant/40 flex items-center justify-center text-primary font-bold text-lg hover:bg-surface-container-low transition-colors"
+                >−</button>
+                <input
+                  type="number"
+                  min={2}
+                  max={20}
+                  value={guestCount}
+                  onChange={(e) => setGuestCount(Math.max(2, Math.min(20, parseInt(e.target.value) || 2)))}
+                  className="flex-1 text-center bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-lg font-bold text-primary focus:outline-none focus:border-primary"
+                />
+                <button
+                  onClick={() => setGuestCount((n) => Math.min(20, n + 1))}
+                  className="w-10 h-10 rounded-full border border-outline-variant/40 flex items-center justify-center text-primary font-bold text-lg hover:bg-surface-container-low transition-colors"
+                >+</button>
+              </div>
+            </div>
+
+            <div className="bg-primary/5 rounded-xl p-5 text-center mb-6">
+              <p className="text-xs text-on-surface-variant mb-1">Each person pays</p>
+              <p className="font-headline text-3xl font-bold text-primary">₹{perPerson.toFixed(2)}</p>
+              <p className="text-xs text-on-surface-variant mt-1">{guestCount} equal shares</p>
+            </div>
+
             <button
-              onClick={() => setSplits((n) => Math.max(2, n - 1))}
-              className="w-10 h-10 rounded-full border border-outline-variant/40 flex items-center justify-center text-primary font-bold text-lg hover:bg-surface-container-low transition-colors"
-            >−</button>
-            <input
-              ref={inputRef}
-              type="number"
-              min={2}
-              max={20}
-              value={splits}
-              onChange={(e) => setSplits(Math.max(2, Math.min(20, parseInt(e.target.value) || 2)))}
-              className="flex-1 text-center bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-lg font-bold text-primary focus:outline-none focus:border-primary"
-            />
-            <button
-              onClick={() => setSplits((n) => Math.min(20, n + 1))}
-              className="w-10 h-10 rounded-full border border-outline-variant/40 flex items-center justify-center text-primary font-bold text-lg hover:bg-surface-container-low transition-colors"
-            >+</button>
+              onClick={() => confirmMutation.mutate()}
+              disabled={confirmMutation.isPending}
+              className="w-full btn-primary py-3"
+            >
+              {confirmMutation.isPending ? 'Creating splits…' : 'Confirm Split'}
+            </button>
+            {confirmMutation.isError && (
+              <p className="text-error text-xs text-center mt-2">
+                {(confirmMutation.error as Error).message}
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="space-y-3">
+            {splitRows.map((row) => {
+              const mode = payModes[row.id] ?? 'cash'
+              return (
+                <div
+                  key={row.id}
+                  className={`rounded-xl border p-4 ${row.is_paid ? 'border-emerald-300 bg-emerald-50' : 'border-outline-variant/30'}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-bold text-on-surface">Guest {row.split_number}</span>
+                    <span className="font-headline font-bold text-primary">₹{row.amount.toFixed(2)}</span>
+                  </div>
+                  {row.is_paid ? (
+                    <p className="text-xs text-emerald-700 font-medium">
+                      Paid via {row.payment_mode?.toUpperCase()}
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-2 mt-1">
+                      <select
+                        value={mode}
+                        onChange={(e) => setPayModes((m) => ({ ...m, [row.id]: e.target.value as PaymentMode }))}
+                        className="flex-1 text-xs bg-surface-container-low border border-outline-variant/30 rounded-lg px-2 py-1.5 focus:outline-none"
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                        <option value="upi">UPI</option>
+                        <option value="complimentary">Complimentary</option>
+                        <option value="credit">Credit</option>
+                      </select>
+                      <button
+                        onClick={() => payMutation.mutate({ splitId: row.id, mode })}
+                        disabled={payMutation.isPending}
+                        className="text-xs btn-primary px-3 py-1.5"
+                      >
+                        Pay
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
-        </div>
-
-        <div className="bg-primary/5 rounded-xl p-5 text-center mb-6">
-          <p className="text-xs text-on-surface-variant mb-1">Each person pays</p>
-          <p className="font-headline text-3xl font-bold text-primary">₹{perPerson.toFixed(2)}</p>
-          <p className="text-xs text-on-surface-variant mt-1">{splits} equal shares</p>
-        </div>
-
-        <button onClick={onClose} className="w-full btn-primary py-3">Done</button>
+        )}
       </div>
     </div>
   )
@@ -287,7 +378,18 @@ export default function BillingPage() {
 
   return (
     <div className="min-h-screen">
-      {splitOpen && <SplitBillModal total={grandTotal} onClose={() => setSplitOpen(false)} />}
+      {splitOpen && bill && (
+        <SplitBillModal
+          billId={bill.id}
+          total={grandTotal}
+          onClose={() => setSplitOpen(false)}
+          onFullySettled={() => {
+            if (selectedTable) qc.invalidateQueries({ queryKey: ['order-for-table', selectedTable.id] })
+            setSplitOpen(false)
+            reset()
+          }}
+        />
+      )}
 
       {/* Void item modal */}
       {voidTarget && (

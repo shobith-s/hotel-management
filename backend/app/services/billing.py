@@ -7,7 +7,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.billing import Bill
+from app.models.billing import Bill, BillSplit
 from app.models.enums import BookingStatus, ChargeType, OrderStatus, PaymentMode, PaymentStatus, TableStatus
 from app.models.lodge import Booking, BookingCharge
 from app.models.order import Order, OrderItem
@@ -161,6 +161,8 @@ def settle_payment(db: Session, bill_id: uuid.UUID, data: PaymentRequest) -> Bil
     bill = get_bill(db, bill_id)
     if bill.payment_status == PaymentStatus.paid:
         raise HTTPException(400, "Bill is already settled")
+    if bill.splits:
+        raise HTTPException(400, "Bill is split — settle each share individually")
 
     bill.payment_mode = data.payment_mode
     bill.payment_status = PaymentStatus.paid
@@ -176,3 +178,57 @@ def settle_payment(db: Session, bill_id: uuid.UUID, data: PaymentRequest) -> Bil
     db.commit()
     db.refresh(bill)
     return bill
+
+
+def split_bill(db: Session, bill_id: uuid.UUID, split_count: int) -> list[BillSplit]:
+    bill = get_bill(db, bill_id)
+    if bill.payment_status == PaymentStatus.paid:
+        raise HTTPException(400, "Bill is already settled")
+    if split_count < 2 or split_count > 20:
+        raise HTTPException(400, "Split count must be between 2 and 20")
+    if bill.splits:
+        raise HTTPException(400, "Bill is already split")
+
+    total = Decimal(str(bill.grand_total))
+    share = (total / split_count).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    remainder = (total - share * (split_count - 1)).quantize(Decimal("0.01"))
+
+    splits = []
+    for i in range(1, split_count + 1):
+        amount = remainder if i == split_count else share
+        s = BillSplit(bill_id=bill_id, split_number=i, amount=float(amount))
+        db.add(s)
+        splits.append(s)
+
+    db.commit()
+    for s in splits:
+        db.refresh(s)
+    return splits
+
+
+def settle_split(db: Session, split_id: uuid.UUID, payment_mode: PaymentMode) -> BillSplit:
+    split = db.get(BillSplit, split_id)
+    if not split:
+        raise HTTPException(404, "Split not found")
+    if split.is_paid:
+        raise HTTPException(400, "Split is already paid")
+
+    split.is_paid = True
+    split.payment_mode = payment_mode
+    split.paid_at = datetime.utcnow()
+    db.flush()
+
+    bill = split.bill
+    if all(s.is_paid for s in bill.splits):
+        bill.payment_status = PaymentStatus.paid
+        bill.payment_mode = payment_mode
+        bill.paid_at = datetime.utcnow()
+        order = db.get(Order, bill.order_id)
+        order.status = OrderStatus.paid
+        table = db.get(Table, order.table_id)
+        table.status = TableStatus.available
+        _release_merge_group(db, table)
+
+    db.commit()
+    db.refresh(split)
+    return split
