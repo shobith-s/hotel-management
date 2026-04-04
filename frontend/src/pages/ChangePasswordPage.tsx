@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth, ROLE_ALLOWED_PATHS } from '../context/AuthContext'
 import { changeOwnPassword } from '../api/users'
 
 export default function ChangePasswordPage() {
@@ -30,7 +30,8 @@ export default function ChangePasswordPage() {
     try {
       const updated = await changeOwnPassword(currentPassword, newPassword)
       if (user) setUser({ ...user, ...updated })
-      navigate('/dashboard', { replace: true })
+      const home = ROLE_ALLOWED_PATHS[updated.role]?.[0] ?? '/dashboard'
+      navigate(home, { replace: true })
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? 'Failed to change password.')
     } finally {

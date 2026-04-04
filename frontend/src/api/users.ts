@@ -4,7 +4,7 @@ export interface User {
   id: string
   name: string
   email: string
-  role: 'admin' | 'manager' | 'waiter' | 'receptionist'
+  role: 'admin' | 'manager' | 'waiter' | 'receptionist' | 'housekeeping'
   is_active: boolean
   force_password_change: boolean
   created_at: string

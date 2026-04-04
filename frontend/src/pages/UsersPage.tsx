@@ -9,21 +9,22 @@ import {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const ALL_ROLES: User['role'][] = ['admin', 'manager', 'waiter', 'receptionist']
+const ALL_ROLES: User['role'][] = ['admin', 'manager', 'waiter', 'receptionist', 'housekeeping']
 
 const roleBadge: Record<string, string> = {
   admin:        'bg-primary text-on-primary',
   manager:      'bg-secondary-container text-on-secondary-container',
   waiter:       'bg-tertiary-fixed text-on-tertiary-fixed-variant',
   receptionist: 'bg-surface-container-high text-on-surface-variant',
+  housekeeping: 'bg-emerald-100 text-emerald-700',
 }
 
 const roleLabel: Record<string, string> = {
-  admin: 'Admin', manager: 'Manager', waiter: 'Waiter', receptionist: 'Receptionist',
+  admin: 'Admin', manager: 'Manager', waiter: 'Waiter', receptionist: 'Receptionist', housekeeping: 'Housekeeping',
 }
 
 const roleIcon: Record<string, string> = {
-  admin: 'shield_person', manager: 'manage_accounts', waiter: 'room_service', receptionist: 'support_agent',
+  admin: 'shield_person', manager: 'manage_accounts', waiter: 'room_service', receptionist: 'support_agent', housekeeping: 'cleaning_services',
 }
 
 // ── Modal wrapper ──────────────────────────────────────────────────────────────
