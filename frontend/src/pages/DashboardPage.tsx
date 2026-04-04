@@ -65,12 +65,12 @@ function TableTile({
             : 'cursor-pointer shadow-sm opacity-80 hover:opacity-100 ' + s.bg
           : s.bg + (editMode ? ' cursor-grab active:cursor-grabbing shadow-lg ring-2 ring-primary/20' : ' cursor-default shadow-sm')
       }`}
-      style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: 88, height: 72, touchAction: 'none' }}
+      style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: 110, height: 96, touchAction: 'none' }}
       onPointerDown={editMode ? onPointerDown : undefined}
       onClick={mergeMode ? onMergeClick : undefined}
     >
       <div className="h-full flex flex-col items-center justify-center gap-1 px-2">
-        <span className={`font-headline font-bold text-lg leading-none ${mergeMode && selected ? 'text-on-primary' : s.text}`}>
+        <span className={`font-headline font-bold text-xl leading-none ${mergeMode && selected ? 'text-on-primary' : s.text}`}>
           {table.table_number}
         </span>
         <div className="flex items-center gap-1">
@@ -87,6 +87,10 @@ function TableTile({
               </span>
             </>
           )}
+        </div>
+        <div className={`flex items-center gap-0.5 ${mergeMode && selected ? 'text-on-primary' : s.text} opacity-60`}>
+          <span className="material-symbols-outlined text-[11px]">chair</span>
+          <span className="text-[10px] font-medium leading-none">{table.capacity}</span>
         </div>
         {editMode && (
           <span className="material-symbols-outlined text-[11px] opacity-25 mt-0.5">drag_pan</span>
