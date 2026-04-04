@@ -47,7 +47,19 @@ function HistoryPanel({ item, onClose }: { item: MenuItem; onClose: () => void }
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {isLoading && <p className="text-sm text-on-surface-variant animate-pulse">Loading history…</p>}
+          {isLoading && (
+            <div className="space-y-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className="animate-pulse bg-surface-container-high rounded-full w-2.5 h-2.5 mt-1 flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="animate-pulse bg-surface-container-high rounded h-3 w-1/3" />
+                    <div className="animate-pulse bg-surface-container-high rounded h-3 w-2/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {!isLoading && history.length === 0 && (
             <div className="text-center py-16 text-on-surface-variant">
               <span className="material-symbols-outlined text-4xl block mb-2 opacity-40">history</span>
@@ -141,7 +153,13 @@ export default function MenuPage() {
           <h3 className="font-headline text-lg font-bold text-primary">Categories</h3>
           <p className="text-xs text-on-surface-variant mt-1">{menu.length} categories</p>
         </div>
-        {isLoading && <p className="px-8 text-sm text-on-surface-variant animate-pulse">Loading…</p>}
+        {isLoading && (
+          <div className="px-8 space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="animate-pulse bg-surface-container-high rounded-xl h-10" />
+            ))}
+          </div>
+        )}
         <nav className="flex flex-col gap-y-0.5">
           {menu.map((cat) => {
             const isActive = cat.id === (activeCatId ?? menu[0]?.id)

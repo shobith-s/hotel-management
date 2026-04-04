@@ -92,7 +92,7 @@ export default function AuditLogPage() {
             Apply
           </button>
           <span className="ml-auto text-xs text-on-surface-variant self-end pb-1">
-            {isLoading ? 'Loading…' : `${logs.length} record${logs.length !== 1 ? 's' : ''}`}
+            {isLoading ? <span className="animate-pulse">—</span> : `${logs.length} record${logs.length !== 1 ? 's' : ''}`}
           </span>
         </div>
 
@@ -100,7 +100,18 @@ export default function AuditLogPage() {
         {isError ? (
           <p className="text-sm text-error text-center py-12">Failed to load audit logs.</p>
         ) : isLoading ? (
-          <p className="text-sm text-on-surface-variant animate-pulse text-center py-12">Loading…</p>
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/10 overflow-hidden">
+            <div className="divide-y divide-outline-variant/10">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex gap-4 px-5 py-4">
+                  <div className="animate-pulse bg-surface-container-high rounded h-3 w-28 flex-shrink-0" />
+                  <div className="animate-pulse bg-surface-container-high rounded h-3 w-16 flex-shrink-0" />
+                  <div className="animate-pulse bg-surface-container-high rounded h-3 flex-1" />
+                  <div className="animate-pulse bg-surface-container-high rounded h-3 w-20 flex-shrink-0" />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : logs.length === 0 ? (
           <div className="text-center py-20 text-on-surface-variant">
             <span className="material-symbols-outlined text-6xl block mb-4 opacity-30">manage_search</span>

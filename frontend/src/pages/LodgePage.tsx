@@ -729,7 +729,11 @@ export default function LodgePage() {
           </div>
 
           {isLoading ? (
-            <div className="text-sm text-on-surface-variant animate-pulse">Loading rooms…</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="animate-pulse bg-surface-container-high rounded-2xl h-28" />
+              ))}
+            </div>
           ) : (
             <>
               {floor1.length > 0 && (

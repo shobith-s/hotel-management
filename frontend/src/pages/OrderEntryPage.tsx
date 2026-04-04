@@ -209,7 +209,11 @@ function TableGrid({
         </div>
 
         {isLoading && (
-          <div className="text-center py-20 text-on-surface-variant animate-pulse text-sm">Loading tables…</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="animate-pulse bg-surface-container-high rounded-2xl h-20" />
+            ))}
+          </div>
         )}
 
         {!isLoading && sorted.length > 0 && (
@@ -415,7 +419,11 @@ export default function OrderEntryPage() {
         </div>
 
         {menuLoading && (
-          <div className="px-10 text-sm text-on-surface-variant animate-pulse">Loading…</div>
+          <div className="px-10 space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="animate-pulse bg-surface-container-high rounded-xl h-10" />
+            ))}
+          </div>
         )}
 
         <nav className="flex flex-col gap-y-1">

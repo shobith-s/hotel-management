@@ -218,9 +218,21 @@ export default function KDSPage() {
 
         {/* Loading */}
         {isLoading && (
-          <div className="text-center py-20 text-on-surface-variant animate-pulse">
-            <span className="material-symbols-outlined text-5xl block mb-3">restaurant</span>
-            <p>Loading orders…</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="animate-pulse bg-surface-container-lowest rounded-2xl shadow-card p-5 space-y-3">
+                <div className="flex justify-between">
+                  <div className="bg-surface-container-high rounded h-4 w-16" />
+                  <div className="bg-surface-container-high rounded h-4 w-20" />
+                </div>
+                <div className="space-y-2 pt-1">
+                  {Array.from({ length: 3 }).map((_, j) => (
+                    <div key={j} className="bg-surface-container-high rounded h-3 w-full" />
+                  ))}
+                </div>
+                <div className="bg-surface-container-high rounded-xl h-9 w-full mt-2" />
+              </div>
+            ))}
           </div>
         )}
 

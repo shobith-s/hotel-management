@@ -311,7 +311,11 @@ export default function DashboardPage() {
 
           {/* Canvas */}
           {tablesLoading ? (
-            <p className="text-sm text-on-surface-variant animate-pulse py-10 text-center">Loading tables…</p>
+            <div className="flex flex-wrap gap-4 py-6 px-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="animate-pulse bg-surface-container-high rounded-xl" style={{ width: 110, height: 96 }} />
+              ))}
+            </div>
           ) : tables.length === 0 ? (
             <p className="text-sm text-on-surface-variant py-10 text-center">No tables configured yet.</p>
           ) : (

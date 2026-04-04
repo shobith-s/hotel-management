@@ -430,7 +430,11 @@ export default function BillingPage() {
             )}
 
             {tablesLoading && (
-              <p className="text-sm text-on-surface-variant animate-pulse">Loading tables…</p>
+              <div className="space-y-2 px-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="animate-pulse bg-surface-container-high rounded-xl h-12" />
+                ))}
+              </div>
             )}
 
             {!tablesLoading && billRequestedTables.length === 0 && occupiedTables.length === 0 && (
@@ -507,7 +511,14 @@ export default function BillingPage() {
                     )}
                   </div>
                   {orderLoading ? (
-                    <div className="p-8 text-center text-sm text-on-surface-variant animate-pulse">Loading…</div>
+                    <div className="divide-y divide-outline-variant/10">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="px-6 py-4 flex justify-between items-center gap-4">
+                          <div className="animate-pulse bg-surface-container-high rounded h-3 flex-1" />
+                          <div className="animate-pulse bg-surface-container-high rounded h-3 w-16" />
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <div className="divide-y divide-outline-variant/10">
                       {activeItems.map((item) => (

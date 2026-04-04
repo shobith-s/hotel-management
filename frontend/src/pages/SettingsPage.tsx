@@ -69,7 +69,14 @@ export default function SettingsPage() {
     return (
       <div className="flex-1 overflow-y-auto bg-surface">
         <TopBar />
-        <div className="p-10 text-sm text-on-surface-variant animate-pulse">Loading…</div>
+        <div className="p-10 max-w-2xl mx-auto space-y-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <div className="animate-pulse bg-surface-container-high rounded h-3 w-24" />
+              <div className="animate-pulse bg-surface-container-high rounded-xl h-11 w-full" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }

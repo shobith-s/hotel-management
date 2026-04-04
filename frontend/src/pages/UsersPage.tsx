@@ -173,7 +173,21 @@ export default function UsersPage() {
 
         {/* Users table */}
         {isLoading ? (
-          <div className="card p-10 text-center text-sm text-on-surface-variant animate-pulse">Loading staff…</div>
+          <div className="card overflow-hidden">
+            <table className="w-full">
+              <tbody className="divide-y divide-outline-variant/10">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i}>
+                    {[...Array(5)].map((__, j) => (
+                      <td key={j} className="px-6 py-4">
+                        <div className={`animate-pulse bg-surface-container-high rounded h-3 ${j === 0 ? 'w-32' : j === 1 ? 'w-40' : j === 2 ? 'w-20' : j === 3 ? 'w-16' : 'w-12'}`} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="card overflow-hidden">
             <table className="w-full text-left">
