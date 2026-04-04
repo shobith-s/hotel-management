@@ -14,6 +14,7 @@ interface CartItem {
   variantLabel: string | null
   price: number
   qty: number
+  notes?: string
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -270,11 +271,13 @@ export default function OrderEntryPage() {
   const [search, setSearch] = useState('')
   const [orderSuccess, setOrderSuccess] = useState(false)
   const [voicePending, setVoicePending] = useState<{ items: VoiceParsedItem[]; transcript: string } | null>(null)
+  const [noteOpenId, setNoteOpenId] = useState<string | null>(null)
 
   const sendMutation = useMutation({
     mutationFn: (data: OrderCreate) => createOrder(data),
     onSuccess: () => {
       setCart([])
+      setNoteOpenId(null)
       setOrderSuccess(true)
       setSelectedTable(null)
       qc.invalidateQueries({ queryKey: ['tables'] })
@@ -388,6 +391,10 @@ export default function OrderEntryPage() {
     )
   }
 
+  function updateNotes(key: string, notes: string) {
+    setCart((prev) => prev.map((c) => c.id === key ? { ...c, notes: notes || undefined } : c))
+  }
+
   function handleSendToKitchen() {
     if (!selectedTable || cart.length === 0) return
     sendMutation.mutate({
@@ -397,6 +404,7 @@ export default function OrderEntryPage() {
         menu_item_id: c.menuItemId,
         variant_id: c.variantId,
         quantity: c.qty,
+        notes: c.notes,
       })),
     })
   }
@@ -577,29 +585,55 @@ export default function OrderEntryPage() {
             </div>
           )}
           {cart.map((cartItem) => (
-            <div key={cartItem.id} className="flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-primary text-sm leading-tight">{cartItem.name}</h4>
-                {cartItem.variantLabel && (
-                  <p className="text-xs text-on-surface-variant">{cartItem.variantLabel}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
+            <div key={cartItem.id} className="space-y-1.5">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-primary text-sm leading-tight">{cartItem.name}</h4>
+                  {cartItem.variantLabel && (
+                    <p className="text-xs text-on-surface-variant">{cartItem.variantLabel}</p>
+                  )}
+                </div>
                 <button
-                  onClick={() => updateQty(cartItem.id, -1)}
-                  className="w-6 h-6 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-surface-container-low"
+                  onClick={() => setNoteOpenId(noteOpenId === cartItem.id ? null : cartItem.id)}
+                  title="Add note"
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                    cartItem.notes
+                      ? 'text-primary bg-primary/10'
+                      : 'text-on-surface-variant hover:text-primary hover:bg-surface-container-low'
+                  }`}
                 >
-                  <span className="material-symbols-outlined text-xs">remove</span>
+                  <span className="material-symbols-outlined text-xs">edit_note</span>
                 </button>
-                <span className="text-xs font-bold text-primary w-4 text-center">{cartItem.qty}</span>
-                <button
-                  onClick={() => updateQty(cartItem.id, 1)}
-                  className="w-6 h-6 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-surface-container-low"
-                >
-                  <span className="material-symbols-outlined text-xs">add</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateQty(cartItem.id, -1)}
+                    className="w-6 h-6 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-surface-container-low"
+                  >
+                    <span className="material-symbols-outlined text-xs">remove</span>
+                  </button>
+                  <span className="text-xs font-bold text-primary w-4 text-center">{cartItem.qty}</span>
+                  <button
+                    onClick={() => updateQty(cartItem.id, 1)}
+                    className="w-6 h-6 rounded-full border border-outline-variant flex items-center justify-center text-primary hover:bg-surface-container-low"
+                  >
+                    <span className="material-symbols-outlined text-xs">add</span>
+                  </button>
+                </div>
+                <span className="text-sm font-bold text-primary w-16 text-right">₹{cartItem.price * cartItem.qty}</span>
               </div>
-              <span className="text-sm font-bold text-primary w-16 text-right">₹{cartItem.price * cartItem.qty}</span>
+              {noteOpenId === cartItem.id && (
+                <input
+                  autoFocus
+                  type="text"
+                  value={cartItem.notes ?? ''}
+                  onChange={(e) => updateNotes(cartItem.id, e.target.value)}
+                  placeholder="e.g. no onion, extra spicy…"
+                  className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-3 py-1.5 text-xs text-primary placeholder:text-on-surface-variant/50 focus:outline-none focus:border-primary transition-colors"
+                />
+              )}
+              {cartItem.notes && noteOpenId !== cartItem.id && (
+                <p className="text-xs text-on-surface-variant italic pl-0.5">{cartItem.notes}</p>
+              )}
             </div>
           ))}
         </div>

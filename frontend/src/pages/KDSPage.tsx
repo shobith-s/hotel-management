@@ -85,24 +85,27 @@ function OrderCard({
         {activeItems.map((item) => (
           <div
             key={item.id}
-            className="flex justify-between items-center border-b border-outline-variant/15 pb-4 last:border-0 last:pb-0"
+            className="flex gap-4 items-start border-b border-outline-variant/15 pb-4 last:border-0 last:pb-0"
           >
-            <div className="flex gap-4 items-center">
-              <span className={`${dotStyle[localStatus]} w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm`}>
-                {item.quantity}
-              </span>
-              <div>
+            <span className={`${dotStyle[localStatus]} w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 mt-0.5`}>
+              {item.quantity}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2">
                 <span className={`text-lg font-medium text-primary ${localStatus === 'ready' ? 'line-through decoration-primary/30' : ''}`}>
                   {item.menu_item.name}
                 </span>
                 {item.variant && (
-                  <span className="text-xs text-on-surface-variant ml-2">({item.variant.label})</span>
+                  <span className="text-xs text-on-surface-variant">({item.variant.label})</span>
                 )}
               </div>
+              {item.notes && (
+                <p className="text-sm font-semibold text-amber-700 mt-0.5 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-base">edit_note</span>
+                  {item.notes}
+                </p>
+              )}
             </div>
-            {item.notes && (
-              <span className="text-on-surface-variant font-medium italic text-sm">{item.notes}</span>
-            )}
           </div>
         ))}
         {activeItems.length === 0 && (
